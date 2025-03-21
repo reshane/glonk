@@ -2,13 +2,15 @@ package store
 
 import (
     "fmt"
+    "log"
     "context"
     "os"
     "errors"
+    "strings"
 
     "github.com/jackc/pgx/v5"
 
-    "github.com/reshane/gorest/types"
+    "github.com/reshane/glonk/types"
 )
 
 type PsqlStore struct {
@@ -27,7 +29,7 @@ var collectors map[string]func(pgx.Rows) (types.DataType, error) = map[string]fu
     "user": func(rows pgx.Rows) (types.DataType, error) { return pgx.CollectOneRow(rows, pgx.RowToStructByPos[types.User]) },
 }
 
-func (s *PsqlStore) Get(dataType string, id int) (types.DataType, error) {
+func (s *PsqlStore) Get(dataType string, id int64) (types.DataType, error) {
     tableName, exists := types.TypeStringToTableName[dataType]
     if !exists {
         return nil, errors.New("No table name for specified data type")
@@ -45,12 +47,33 @@ func (s *PsqlStore) Get(dataType string, id int) (types.DataType, error) {
     return data, err
 }
 
+func (s *PsqlStore) GetByGuid(dataType string, guid string) (types.DataType, error) {
+    tableName, exists := types.TypeStringToTableName[dataType]
+    if !exists {
+        return nil, errors.New("No table name for specified data type")
+    }
+    query := fmt.Sprintf("select * from %s where guid=$1", tableName)
+    rows, err := s.conn.Query(context.Background(), query, guid)
+    if err != nil {
+        return nil, err
+    }
+    collector, exists := collectors[dataType]
+    if !exists {
+        return nil, errors.New("No collector function for specified data type")
+    }
+    data, err := collector(rows)
+    return data, err
+}
+
 func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
-    rows := [][]any{ dataType.IntoRow() }
+    // TODO: this pgx functionality should be used for a CreateMany function
+    // change this to something like `insert into $1 ($2, $3...) values ($4, $5...) returning *;
+    // and use the pgx.Query() function so that we can return the new value
+    rows := [][]any{ dataType.IntoRow()[1:] }
     copyCount, err := s.conn.CopyFrom(
         context.Background(),
         pgx.Identifier{ dataType.TableName() },
-        dataType.Fields(),
+        dataType.Fields()[1:],
         pgx.CopyFromRows(rows),
     )
     if err != nil {
@@ -63,23 +86,38 @@ func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
 }
 
 func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
-    rows := [][]any{ dataType.IntoRow() }
-    copyCount, err := s.conn.CopyFrom(
-        context.Background(),
-        pgx.Identifier{ dataType.TableName() },
-        dataType.Fields(),
-        pgx.CopyFromRows(rows),
-    )
+    fieldMap := types.SparseUpdate(dataType)
+    tableName := dataType.TableName()
+    // turn fieldMap into `foo = @foo, bar = @bar`
+
+    setStrings := make([]string, 0)
+    values := make([]any, 0)
+    var i int = 1
+    for field, val := range fieldMap {
+        if field != "id" {
+            setStrings = append(setStrings, fmt.Sprintf("%s = $%d", field, i))
+            values = append(values, val)
+            i += 1
+        }
+    }
+    values = append(values, dataType.Id())
+    fieldSetString := strings.Join(setStrings, ", ")
+
+    query := fmt.Sprintf("update %s set %s where id = $%d returning *", tableName, fieldSetString, i)
+    rows, err := s.conn.Query(context.Background(), query, values...)
     if err != nil {
         return nil, err
     }
-    if copyCount != 1 {
-        return nil, errors.New("Could not create record")
+    collector, exists := collectors[dataType.TypeString()]
+    if !exists {
+        log.Println("No collector function for specified data type:", dataType.TypeString())
+        return nil, errors.New("No collector function for specified data type")
     }
-    return dataType, nil
+    data, err := collector(rows)
+    return data, err
 }
 
-func (s *PsqlStore) Delete(dataType string, id int) error {
+func (s *PsqlStore) Delete(dataType string, id int64) error {
     tableName, exists := types.TypeStringToTableName[dataType]
     if !exists {
         return errors.New("No table name for specified data type")

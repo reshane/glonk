@@ -4,8 +4,8 @@ import (
     "log"
     "flag"
 
-    "github.com/reshane/gorest/api"
-    "github.com/reshane/gorest/store"
+    "github.com/reshane/glonk/api"
+    "github.com/reshane/glonk/store"
 )
 
 func main() {

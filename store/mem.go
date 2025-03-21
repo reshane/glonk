@@ -3,19 +3,19 @@ package store
 import (
     "errors"
 
-    "github.com/reshane/gorest/types"
+    "github.com/reshane/glonk/types"
 )
 
 type MemStore struct {
-    users map[int]types.User
+    users map[int64]types.User
 }
 
 func NewMemStore() *MemStore {
     user := types.User{ ID: 1, Name: "Shane" }
-    return &MemStore { users: map[int]types.User{ user.ID: user } }
+    return &MemStore { users: map[int64]types.User{ user.ID: user } }
 }
 
-func (s *MemStore) GetUser(id int) (*types.User, error) {
+func (s *MemStore) GetUser(id int64) (*types.User, error) {
     if user, exists := s.users[id]; exists {
         return &user, nil
     }
@@ -40,7 +40,7 @@ func (s *MemStore) UpdateUser(user *types.User) (*types.User, error) {
     return user, nil
 }
 
-func (s *MemStore) DeleteUser(id int) error {
+func (s *MemStore) DeleteUser(id int64) error {
     if _, exists := s.users[id]; exists {
         delete(s.users, id)
         return nil

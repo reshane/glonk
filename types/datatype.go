@@ -21,5 +21,19 @@ type DataType interface {
     TableName() string
     Fields() []string
     Validate() bool
+    TypeString() string
+    Id() int64
+}
+
+func SparseUpdate(dt DataType) map[string]any {
+    fields := dt.Fields()
+    vals := dt.IntoRow()
+    resultMap := make(map[string]any, 0)
+    for i := 0; i < len(fields); i++ {
+        if vals[i] != nil {
+            resultMap[fields[i]] = vals[i]
+        }
+    }
+    return resultMap
 }
 

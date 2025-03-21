@@ -6,15 +6,22 @@ import (
     "fmt"
     "os"
     "time"
+    "strconv"
     "crypto/rand"
     "context"
     "encoding/base64"
     "encoding/json"
+    "errors"
 
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
+
+    "github.com/jackc/pgx/v5"
+
+    "github.com/reshane/glonk/types"
 )
 
+// session struct
 type session struct {
     userId string
     expiry time.Time
@@ -32,8 +39,24 @@ type UserInfo struct {
     Locale string `json"locale"`
 }
 
-var sessions = map[string]session{}
+var (
+    // sessions map
+    sessions = map[string]session{}
 
+    // google oauth config
+    cfg = &oauth2.Config{
+        RedirectURL: "http://localhost:8080/auth/google/callback",
+        ClientID: os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
+        ClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+        Scopes: []string{"email", "profile"},
+        Endpoint: google.Endpoint,
+    }
+)
+
+// google user info endpoint
+const oauthGoogleUrlAPI = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
+
+// authorization middleware
 func isAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         sessionId, err := r.Cookie("session_id")
@@ -55,21 +78,12 @@ func isAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handle
     })
 }
 
-var cfg = &oauth2.Config{
-    RedirectURL: "http://localhost:8080/auth/google/callback",
-    ClientID: os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
-    ClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
-    Scopes: []string{"email", "profile"},
-    Endpoint: google.Endpoint,
-}
-const oauthGoogleUrlAPI = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
-
+// loging endpoint & callback
 func (s *Server) googleLogin(w http.ResponseWriter, r *http.Request) {
     oauthState := generateStateCookie(w)
     u := cfg.AuthCodeURL(oauthState)
     http.Redirect(w, r, u, http.StatusTemporaryRedirect)
 }
-
 func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
     oauthState, err := r.Cookie("oauthstate")
     if err != nil {
@@ -94,9 +108,15 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // generate token
-    // redirect to homepage with Authorization header set
-    var expiration = time.Now().Add(time.Minute)
+    // redirect to user endpoint
+    retreivedUser, err := s.retreiveOrCreateUser(userInfo)
+    if err != nil {
+        http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+        return
+    }
+    newUserId := retreivedUser.ID
+
+    var expiration = time.Now().Add(20 * time.Minute)
     b := make([]byte, 16)
     rand.Read(b)
     sessionId := base64.URLEncoding.EncodeToString(b)
@@ -109,11 +129,41 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
     }
     http.SetCookie(w, &cookie)
     sessions[sessionId] = session {
-        userId: userInfo.Id,
+        userId: retreivedUser.Guid,
         expiry: expiration,
     }
 
-    http.Redirect(w, r, "/data/user/1", http.StatusTemporaryRedirect)
+    redirectUrl := "/data/user/" + strconv.FormatInt(newUserId, 10)
+    http.Redirect(w, r, redirectUrl, http.StatusTemporaryRedirect)
+}
+
+func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
+    guid := userInfo.Id
+    user, err := s.db.GetByGuid("user", "google/" + guid)
+    if err != nil {
+        if !errors.Is(err, pgx.ErrNoRows) {
+            return nil, err
+        }
+
+        newUser := types.User{
+            Guid: "google/" + guid,
+            Name: userInfo.Name,
+        }
+        log.Println("Creating new user", newUser)
+        _, err := s.db.Create(newUser)
+        if err != nil {
+            log.Println("Error creating new user:", err.Error())
+            return nil, err
+        }
+
+        user, err = s.db.GetByGuid("user", "google/" + guid)
+        if err != nil {
+            log.Println("Could not retreive user after create", err.Error())
+            return nil, err
+        } 
+    }
+    retreivedUser := user.(types.User)
+    return &retreivedUser, nil
 }
 
 func generateStateCookie(w http.ResponseWriter) string {

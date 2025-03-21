@@ -6,12 +6,13 @@ import (
 )
 
 type User struct {
-    ID int `json:"id"`
+    ID int64 `json:"id"`
+    Guid string `json:"guid"`
     Name string `json:"name"`
 }
 
 func (u User) Fields() []string {
-    return []string{ "id", "name" }
+    return []string{ "id", "guid", "name" }
 }
 
 func (u User) TableName() string {
@@ -19,11 +20,19 @@ func (u User) TableName() string {
 }
 
 func (u User) IntoRow() []any {
-    return []any{ u.ID, u.Name }
+    return []any{ u.ID, u.Guid, u.Name }
+}
+
+func (u User) TypeString() string {
+    return "user"
+}
+
+func (u User) Id() int64 {
+    return u.ID
 }
 
 func (u User) Validate() bool {
-    return len(u.Name) > 0
+    return len(u.Name) > 0 && len(u.Guid) > 0
 }
 
 func DecodeUserJson(r *http.Request) (DataType, error) {

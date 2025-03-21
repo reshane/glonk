@@ -4,11 +4,12 @@ import (
     "net/http"
     "encoding/json"
     "strconv"
+    "log"
 
     "github.com/gorilla/mux"
 
-    "github.com/reshane/gorest/store"
-    "github.com/reshane/gorest/types"
+    "github.com/reshane/glonk/store"
+    "github.com/reshane/glonk/types"
 )
 
 type Server struct {
@@ -54,11 +55,13 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
     data, err := types.Decoders[dataType](r)
     if err != nil {
+        log.Println(err)
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
 
     if !data.Validate() {
+        log.Println("Invalid data in update request:", data)
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
@@ -108,7 +111,7 @@ func (s *Server) handleDeleteByID(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    id, err := strconv.Atoi(vars["id"])
+    id, err := strconv.ParseInt(vars["id"], 10, 64)
     if err != nil {
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
@@ -131,7 +134,7 @@ func (s *Server) handleGetByID(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    id, err := strconv.Atoi(vars["id"])
+    id, err := strconv.ParseInt(vars["id"], 10, 64)
     if err != nil {
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
