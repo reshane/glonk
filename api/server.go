@@ -25,14 +25,21 @@ func NewServer(listenAddr string, db store.Store) *Server {
 
 func (s *Server) Start() error {
     r := mux.NewRouter()
-    r.Handle("/{dataType}/{id}", isAuthorized(s.handleGetByID)).
+    // data endpoints
+    r.Handle("/data/{dataType}/{id}", isAuthorized(s.handleGetByID)).
         Methods("GET")
-    r.Handle("/{dataType}", isAuthorized(s.handleCreate)).
+    r.Handle("/data/{dataType}", isAuthorized(s.handleCreate)).
         Methods("POST")
-    r.Handle("/{dataType}", isAuthorized(s.handleUpdate)).
+    r.Handle("/data/{dataType}", isAuthorized(s.handleUpdate)).
         Methods("PUT")
-    r.Handle("/{dataType}/{id}", isAuthorized(s.handleDeleteByID)).
+    r.Handle("/data/{dataType}/{id}", isAuthorized(s.handleDeleteByID)).
         Methods("DELETE")
+
+    // auth
+    r.HandleFunc("/auth/google/login", s.googleLogin)
+    r.HandleFunc("/auth/google/callback", s.googleCallback)
+    r.Handle("/", http.FileServer(http.Dir("./templates")))
+
     http.Handle("/", r)
     return http.ListenAndServe(s.listenAddr, nil)
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-    listenAddr := flag.String("listenaddr", ":3000", "The server address")
+    listenAddr := flag.String("listenaddr", ":8080", "The server address")
     flag.Parse()
 
     db, err := store.NewPsqlStore()
