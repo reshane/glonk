@@ -27,6 +27,7 @@ func NewPsqlStore() (*PsqlStore, error) {
 
 var collectors map[string]func(pgx.Rows) (types.DataType, error) = map[string]func(pgx.Rows) (types.DataType, error) {
     "user": func(rows pgx.Rows) (types.DataType, error) { return pgx.CollectOneRow(rows, pgx.RowToStructByPos[types.User]) },
+    "note": func(rows pgx.Rows) (types.DataType, error) { return pgx.CollectOneRow(rows, pgx.RowToStructByPos[types.Note]) },
 }
 
 func (s *PsqlStore) Get(dataType string, id int64) (types.DataType, error) {

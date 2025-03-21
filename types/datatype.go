@@ -6,14 +6,17 @@ import (
 
 var TypeStrings map[string]struct{} = map[string]struct{}{
     "user": struct{}{},
+    "note": struct{}{},
 }
 
 var TypeStringToTableName map[string]string = map[string]string {
     "user": "users",
+    "note": "notes",
 }
 
 var Decoders map[string]func(*http.Request) (DataType, error) = map[string]func(*http.Request) (DataType, error) {
     "user": DecodeUserJson,
+    "note": DecodeNoteJson,
 }
 
 type DataType interface {

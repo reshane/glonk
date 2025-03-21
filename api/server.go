@@ -85,17 +85,20 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 
     data, err := types.Decoders[dataType](r)
     if err != nil {
+        log.Println(err)
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
 
     if !data.Validate() {
+        log.Println("Invalid data in request:", data)
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
 
     created, err := s.db.Create(data)
     if err != nil {
+        log.Println("Could not create object:", err)
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
@@ -136,12 +139,14 @@ func (s *Server) handleGetByID(w http.ResponseWriter, r *http.Request) {
 
     id, err := strconv.ParseInt(vars["id"], 10, 64)
     if err != nil {
+        log.Println("Could not parse int from id: ", vars["id"], err)
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
 
     data, err := s.db.Get(dataType, id)
     if err != nil {
+        log.Println("Could not find data:", err)
         http.Error(w, "Not Found", http.StatusNotFound)
         return
     }
