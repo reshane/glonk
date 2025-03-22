@@ -19,6 +19,11 @@ var Decoders map[string]func(*http.Request) (DataType, error) = map[string]func(
     "note": DecodeNoteJson,
 }
 
+var QueryParsers map[string]map[string]func([]string) (Query, error) = map[string]map[string]func([]string) (Query, error) {
+    "user": UserQueries,
+    "note": NoteQueries,
+}
+
 type DataType interface {
     IntoRow() []any
     TableName() string
@@ -26,6 +31,10 @@ type DataType interface {
     Validate() bool
     TypeString() string
     Id() int64
+}
+
+type Query interface {
+    Sql() (string, map[string]any)
 }
 
 func SparseUpdate(dt DataType) map[string]any {

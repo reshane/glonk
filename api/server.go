@@ -29,6 +29,8 @@ func (s *Server) Start() error {
     // data endpoints
     r.Handle("/data/{dataType}/{id}", isAuthorized(s.handleGetByID)).
         Methods("GET")
+    r.Handle("/data/{dataType}", isAuthorized(s.handleGetByQueries)).
+        Methods("GET")
     r.Handle("/data/{dataType}", isAuthorized(s.handleCreate)).
         Methods("POST")
     r.Handle("/data/{dataType}", isAuthorized(s.handleUpdate)).
@@ -127,6 +129,43 @@ func (s *Server) handleDeleteByID(w http.ResponseWriter, r *http.Request) {
         return
     }
     w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleGetByQueries(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    dataType := vars["dataType"]
+    if _, exists := types.TypeStrings[dataType]; !exists {
+        http.Error(w, "Not Found", http.StatusNotFound)
+        return
+    }
+
+    parsers, exists := types.QueryParsers[dataType]
+    if !exists {
+        log.Println("Could not find query parsers for data type:", dataType)
+    }
+
+    queries := make([]types.Query, 0)
+    for k, v := range r.URL.Query() {
+        parser, exists := parsers[k]
+        if !exists {
+            log.Printf("Could not find query %s for data type %s\n", k, dataType)
+            continue
+        }
+        query, err := parser(v)
+        if err != nil {
+            log.Printf("Error parsing query param %s for query %s: %v\n", v, k, err)
+            continue
+        }
+        queries = append(queries, query)
+    }
+
+    data, err := s.db.GetByQueries(dataType, queries)
+    if err != nil {
+        log.Println("Could not find data:", err)
+        http.Error(w, "Not Found", http.StatusNotFound)
+        return
+    }
+    json.NewEncoder(w).Encode(data)
 }
 
 func (s *Server) handleGetByID(w http.ResponseWriter, r *http.Request) {

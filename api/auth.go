@@ -147,7 +147,9 @@ func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
 
         newUser := types.User{
             Guid: "google/" + guid,
+            Email: userInfo.Email,
             Name: userInfo.Name,
+            Picture: userInfo.Picture,
         }
         log.Println("Creating new user", newUser)
         _, err := s.db.Create(newUser)

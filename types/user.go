@@ -8,23 +8,32 @@ import (
 type User struct {
     ID int64 `json:"id"`
     Guid string `json:"guid"`
+    Email string `json"email"`
     Name string `json:"name"`
+    Picture string `json"picture"`
+}
+
+var (
+    UserQueries = map[string]func([]string) (Query, error){}
+    userTableName = "users"
+    userFields = []string{ "id", "guid", "email", "name", "picture" }
+    userTypeString = "user"
+)
+
+func (u User) TableName() string {
+    return userTableName
 }
 
 func (u User) Fields() []string {
-    return []string{ "id", "guid", "name" }
-}
-
-func (u User) TableName() string {
-    return "users"
+    return userFields
 }
 
 func (u User) IntoRow() []any {
-    return []any{ u.ID, u.Guid, u.Name }
+    return []any{ u.ID, u.Guid, u.Email, u.Name, u.Picture }
 }
 
 func (u User) TypeString() string {
-    return "user"
+    return userTypeString
 }
 
 func (u User) Id() int64 {
@@ -40,3 +49,4 @@ func DecodeUserJson(r *http.Request) (DataType, error) {
     err := json.NewDecoder(r.Body).Decode(&user)
     return user, err
 }
+

@@ -25,9 +25,9 @@ func NewPsqlStore() (*PsqlStore, error) {
     return &PsqlStore{ conn: conn }, nil
 }
 
-var collectors map[string]func(pgx.Rows) (types.DataType, error) = map[string]func(pgx.Rows) (types.DataType, error) {
-    "user": func(rows pgx.Rows) (types.DataType, error) { return pgx.CollectOneRow(rows, pgx.RowToStructByPos[types.User]) },
-    "note": func(rows pgx.Rows) (types.DataType, error) { return pgx.CollectOneRow(rows, pgx.RowToStructByPos[types.Note]) },
+var collectors map[string]func(pgx.CollectableRow) (types.DataType, error) = map[string]func(pgx.CollectableRow) (types.DataType, error) {
+    "user": func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByPos[types.User](cr); return res, err },
+    "note": func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByPos[types.Note](cr); return res, err },
 }
 
 func (s *PsqlStore) Get(dataType string, id int64) (types.DataType, error) {
@@ -44,7 +44,44 @@ func (s *PsqlStore) Get(dataType string, id int64) (types.DataType, error) {
     if !exists {
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := collector(rows)
+    data, err := pgx.CollectOneRow(rows, collector)
+    return data, err
+}
+
+func (s *PsqlStore) GetByQueries(dataType string, queries []types.Query) ([]types.DataType, error) {
+    tableName, exists := types.TypeStringToTableName[dataType]
+    if !exists {
+        return nil, errors.New("No table name for specified data type")
+    }
+
+    clauses := make([]string, 0)
+    finalArgs := make([]any, 0)
+    i := 1
+    for _, query := range queries {
+        // get the sql and argument map
+        clause, args := query.Sql()
+        for k, v := range args {
+            // TODO: Add a check for collisions here
+            // we can't have incompatible queries
+            named := fmt.Sprintf("@%s", k)
+            ordinal := fmt.Sprintf("$%d", i)
+            clause = strings.Replace(clause, named, ordinal, -1)
+            i += 1
+            finalArgs = append(finalArgs, v)
+        }
+        clauses = append(clauses, "(" + clause + ")")
+    }
+
+    query := fmt.Sprintf("select * from %s where ", tableName) + strings.Join(clauses, " and ")
+    rows, err := s.conn.Query(context.Background(), query, finalArgs...)
+    if err != nil {
+        return nil, err
+    }
+    collector, exists := collectors[dataType]
+    if !exists {
+        return nil, errors.New("No collector function for specified data type")
+    }
+    data, err := pgx.CollectRows(rows, collector)
     return data, err
 }
 
