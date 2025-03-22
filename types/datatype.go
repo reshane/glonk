@@ -24,13 +24,24 @@ var QueryParsers map[string]map[string]func([]string) (Query, error) = map[strin
     "note": NoteQueries,
 }
 
+var MetaData map[string]TypeMetaData = map[string]TypeMetaData {
+    "note": NoteMeta,
+    "user": UserMeta,
+}
+
 type DataType interface {
     IntoRow() []any
-    TableName() string
-    Fields() []string
     Validate() bool
     TypeString() string
-    Id() int64
+    GetId() int64
+    GetOwnerId() int64
+}
+
+type TypeMetaData interface {
+    TableName() string
+    Fields() []string
+    OwnerIdField() string
+    IdField() string
 }
 
 type Query interface {
@@ -38,7 +49,7 @@ type Query interface {
 }
 
 func SparseUpdate(dt DataType) map[string]any {
-    fields := dt.Fields()
+    fields := MetaData[dt.TypeString()].Fields()
     vals := dt.IntoRow()
     resultMap := make(map[string]any, 0)
     for i := 0; i < len(fields); i++ {

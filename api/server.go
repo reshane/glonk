@@ -5,6 +5,7 @@ import (
     "encoding/json"
     "strconv"
     "log"
+    "fmt"
 
     "github.com/gorilla/mux"
 
@@ -47,6 +48,19 @@ func (s *Server) Start() error {
     return http.ListenAndServe(s.listenAddr, nil)
 }
 
+func getOwnerIdFromRequestHeaders(r *http.Request) (int64, error) {
+    ownerIdHeaderVal := r.Header.Get("OwnerID")
+    if len(ownerIdHeaderVal) < 1 {
+        return -1, fmt.Errorf("Invalid OwnerID Header value %s", ownerIdHeaderVal)
+    }
+
+    ownerId, err := strconv.ParseInt(ownerIdHeaderVal, 10, 64)
+    if err != nil {
+        return -1, err
+    }
+    return ownerId, nil
+}
+
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
     dataType := vars["dataType"]
@@ -74,6 +88,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(updated)
 }
 
@@ -105,10 +120,18 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(created)
 }
 
 func (s *Server) handleDeleteByID(w http.ResponseWriter, r *http.Request) {
+    ownerId, err := getOwnerIdFromRequestHeaders(r)
+    if err != nil {
+        log.Println("Could not get ownerId from headers", err)
+        http.Error(w, "Bad Request", http.StatusBadRequest)
+        return
+    }
+
     vars := mux.Vars(r)
     dataType := vars["dataType"]
     if _, exists := types.TypeStrings[dataType]; !exists {
@@ -123,15 +146,23 @@ func (s *Server) handleDeleteByID(w http.ResponseWriter, r *http.Request) {
     }
 
 
-    err = s.db.Delete(dataType, id)
+    err = s.db.Delete(dataType, id, ownerId)
     if err != nil {
         http.Error(w, "Not Found", http.StatusNotFound)
         return
     }
+    w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleGetByQueries(w http.ResponseWriter, r *http.Request) {
+    ownerId, err := getOwnerIdFromRequestHeaders(r)
+    if err != nil {
+        log.Println("Could not get ownerId from headers", err)
+        http.Error(w, "Bad Request", http.StatusBadRequest)
+        return
+    }
+
     vars := mux.Vars(r)
     dataType := vars["dataType"]
     if _, exists := types.TypeStrings[dataType]; !exists {
@@ -159,16 +190,24 @@ func (s *Server) handleGetByQueries(w http.ResponseWriter, r *http.Request) {
         queries = append(queries, query)
     }
 
-    data, err := s.db.GetByQueries(dataType, queries)
+    data, err := s.db.GetByQueries(dataType, queries, ownerId)
     if err != nil {
         log.Println("Could not find data:", err)
         http.Error(w, "Not Found", http.StatusNotFound)
         return
     }
+    w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(data)
 }
 
 func (s *Server) handleGetByID(w http.ResponseWriter, r *http.Request) {
+    ownerId, err := getOwnerIdFromRequestHeaders(r)
+    if err != nil {
+        log.Println("Could not get ownerId from headers", err)
+        http.Error(w, "Bad Request", http.StatusBadRequest)
+        return
+    }
+
     vars := mux.Vars(r)
     dataType := vars["dataType"]
     if _, exists := types.TypeStrings[dataType]; !exists {
@@ -183,11 +222,12 @@ func (s *Server) handleGetByID(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    data, err := s.db.Get(dataType, id)
+    data, err := s.db.Get(dataType, id, ownerId)
     if err != nil {
         log.Println("Could not find data:", err)
         http.Error(w, "Not Found", http.StatusNotFound)
         return
     }
+    w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(data)
 }

@@ -15,6 +15,26 @@ type Note struct {
     Contents string `json:"contents"`
 }
 
+// Note metadata
+type noteMeta struct{}
+var NoteMeta noteMeta
+
+func (noteMeta) OwnerIdField() string {
+    return "owner_id"
+}
+
+func (noteMeta) IdField() string {
+    return "id"
+}
+
+func (noteMeta) Fields() []string {
+    return noteFields
+}
+
+func (noteMeta) TableName() string {
+    return noteTableName
+}
+
 var (
     NoteQueries = map[string]func([]string) (Query, error){
         "byOwnerId": ByOwnerIdFromQueryParam,
@@ -26,13 +46,6 @@ var (
 )
 
 // DataType implementation for Note
-func (n Note) Fields() []string {
-    return noteFields
-}
-
-func (n Note) TableName() string {
-    return noteTableName
-}
 
 func (n Note) IntoRow() []any {
     return []any{ n.ID, n.OwnerId, n.Contents }
@@ -42,8 +55,12 @@ func (n Note) TypeString() string {
     return noteTypeString
 }
 
-func (n Note) Id() int64 {
+func (n Note) GetId() int64 {
     return n.ID
+}
+
+func (n Note) GetOwnerId() int64 {
+    return n.OwnerId
 }
 
 func (n Note) Validate() bool {

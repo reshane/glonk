@@ -24,6 +24,7 @@ import (
 // session struct
 type session struct {
     userId string
+    ownerId int64
     expiry time.Time
 }
 
@@ -70,6 +71,7 @@ func isAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handle
         }
         session, exists := sessions[sessionId.Value]
         if exists && session.expiry.After(time.Now()) {
+            r.Header.Set("OwnerId", strconv.FormatInt(session.ownerId, 10))
             endpoint(w, r)
             return
         }
@@ -84,6 +86,7 @@ func (s *Server) googleLogin(w http.ResponseWriter, r *http.Request) {
     u := cfg.AuthCodeURL(oauthState)
     http.Redirect(w, r, u, http.StatusTemporaryRedirect)
 }
+
 func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
     oauthState, err := r.Cookie("oauthstate")
     if err != nil {
@@ -109,12 +112,13 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
     }
 
     // redirect to user endpoint
-    retreivedUser, err := s.retreiveOrCreateUser(userInfo)
+    retrievedUser, err := s.retreiveOrCreateUser(userInfo)
     if err != nil {
+        log.Println(err.Error())
         http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
         return
     }
-    newUserId := retreivedUser.ID
+    newUserId := retrievedUser.ID
 
     var expiration = time.Now().Add(20 * time.Minute)
     b := make([]byte, 16)
@@ -129,7 +133,8 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
     }
     http.SetCookie(w, &cookie)
     sessions[sessionId] = session {
-        userId: retreivedUser.Guid,
+        userId: retrievedUser.Guid,
+        ownerId: retrievedUser.ID,
         expiry: expiration,
     }
 
@@ -147,8 +152,8 @@ func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
 
         newUser := types.User{
             Guid: "google/" + guid,
-            Email: userInfo.Email,
             Name: userInfo.Name,
+            Email: userInfo.Email,
             Picture: userInfo.Picture,
         }
         log.Println("Creating new user", newUser)

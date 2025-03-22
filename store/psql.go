@@ -26,17 +26,23 @@ func NewPsqlStore() (*PsqlStore, error) {
 }
 
 var collectors map[string]func(pgx.CollectableRow) (types.DataType, error) = map[string]func(pgx.CollectableRow) (types.DataType, error) {
-    "user": func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByPos[types.User](cr); return res, err },
-    "note": func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByPos[types.Note](cr); return res, err },
+    "user": func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByName[types.User](cr); return res, err },
+    "note": func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByName[types.Note](cr); return res, err },
 }
 
-func (s *PsqlStore) Get(dataType string, id int64) (types.DataType, error) {
+func (s *PsqlStore) Get(dataType string, id int64, ownerId int64) (types.DataType, error) {
     tableName, exists := types.TypeStringToTableName[dataType]
     if !exists {
         return nil, errors.New("No table name for specified data type")
     }
-    query := fmt.Sprintf("select * from %s where id=$1", tableName)
-    rows, err := s.conn.Query(context.Background(), query, id)
+
+    metaData, exists := types.MetaData[dataType]
+    if !exists {
+        return nil, errors.New("No metadata for specified data type")
+    }
+
+    query := fmt.Sprintf("select %s from %s where %s=$1 and %s=$2", strings.Join(metaData.Fields(), " , "), tableName, metaData.IdField(), metaData.OwnerIdField())
+    rows, err := s.conn.Query(context.Background(), query, id, ownerId)
     if err != nil {
         return nil, err
     }
@@ -48,10 +54,15 @@ func (s *PsqlStore) Get(dataType string, id int64) (types.DataType, error) {
     return data, err
 }
 
-func (s *PsqlStore) GetByQueries(dataType string, queries []types.Query) ([]types.DataType, error) {
+func (s *PsqlStore) GetByQueries(dataType string, queries []types.Query, ownerId int64) ([]types.DataType, error) {
     tableName, exists := types.TypeStringToTableName[dataType]
     if !exists {
-        return nil, errors.New("No table name for specified data type")
+        return nil, errors.New("No table name for specified data type " + dataType)
+    }
+
+    metaData, exists := types.MetaData[dataType]
+    if !exists {
+        return nil, errors.New("No meta data for specified data type " + dataType)
     }
 
     clauses := make([]string, 0)
@@ -71,8 +82,12 @@ func (s *PsqlStore) GetByQueries(dataType string, queries []types.Query) ([]type
         }
         clauses = append(clauses, "(" + clause + ")")
     }
+    ownerIdClause := fmt.Sprintf("%s = $%d", metaData.OwnerIdField(), i)
 
-    query := fmt.Sprintf("select * from %s where ", tableName) + strings.Join(clauses, " and ")
+    clauses = append(clauses, ownerIdClause)
+    finalArgs = append(finalArgs, ownerId)
+
+    query := fmt.Sprintf("select %s from %s where ", strings.Join(metaData.Fields(), " , "), tableName) + strings.Join(clauses, " and ")
     rows, err := s.conn.Query(context.Background(), query, finalArgs...)
     if err != nil {
         return nil, err
@@ -86,11 +101,16 @@ func (s *PsqlStore) GetByQueries(dataType string, queries []types.Query) ([]type
 }
 
 func (s *PsqlStore) GetByGuid(dataType string, guid string) (types.DataType, error) {
+    metaData, exists := types.MetaData[dataType]
+    if !exists {
+        return nil, errors.New("No metadata found for specified data type")
+    }
+
     tableName, exists := types.TypeStringToTableName[dataType]
     if !exists {
         return nil, errors.New("No table name for specified data type")
     }
-    query := fmt.Sprintf("select * from %s where guid=$1", tableName)
+    query := fmt.Sprintf("select %s from %s where guid=$1", strings.Join(metaData.Fields(), " , "), tableName)
     rows, err := s.conn.Query(context.Background(), query, guid)
     if err != nil {
         return nil, err
@@ -99,7 +119,7 @@ func (s *PsqlStore) GetByGuid(dataType string, guid string) (types.DataType, err
     if !exists {
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := collector(rows)
+    data, err := pgx.CollectOneRow(rows, collector)
     return data, err
 }
 
@@ -107,11 +127,16 @@ func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
     // TODO: this pgx functionality should be used for a CreateMany function
     // change this to something like `insert into $1 ($2, $3...) values ($4, $5...) returning *;
     // and use the pgx.Query() function so that we can return the new value
+    metaData, exists := types.MetaData[dataType.TypeString()]
+    if !exists {
+        return nil, errors.New("No metadata found for specified dataType")
+    }
+
     rows := [][]any{ dataType.IntoRow()[1:] }
     copyCount, err := s.conn.CopyFrom(
         context.Background(),
-        pgx.Identifier{ dataType.TableName() },
-        dataType.Fields()[1:],
+        pgx.Identifier{ metaData.TableName() },
+        metaData.Fields()[1:],
         pgx.CopyFromRows(rows),
     )
     if err != nil {
@@ -124,9 +149,13 @@ func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
 }
 
 func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
+    metaData, exists := types.MetaData[dataType.TypeString()]
+    if !exists {
+        return nil, errors.New("No metadata found for specified dataType")
+    }
+
     fieldMap := types.SparseUpdate(dataType)
-    tableName := dataType.TableName()
-    // turn fieldMap into `foo = @foo, bar = @bar`
+    tableName := metaData.TableName()
 
     setStrings := make([]string, 0)
     values := make([]any, 0)
@@ -138,10 +167,11 @@ func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
             i += 1
         }
     }
-    values = append(values, dataType.Id())
+    values = append(values, dataType.GetId())
+    values = append(values, dataType.GetOwnerId())
     fieldSetString := strings.Join(setStrings, ", ")
 
-    query := fmt.Sprintf("update %s set %s where id = $%d returning *", tableName, fieldSetString, i)
+    query := fmt.Sprintf("update %s set %s where id = $%d and owner_id = $%d returning *", tableName, fieldSetString, i, i + 1)
     rows, err := s.conn.Query(context.Background(), query, values...)
     if err != nil {
         return nil, err
@@ -155,13 +185,13 @@ func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
     return data, err
 }
 
-func (s *PsqlStore) Delete(dataType string, id int64) error {
+func (s *PsqlStore) Delete(dataType string, id int64, owner_id int64) error {
     tableName, exists := types.TypeStringToTableName[dataType]
     if !exists {
         return errors.New("No table name for specified data type")
     }
-    query := fmt.Sprintf("delete from %s where id=$1", tableName)
-    commandTag, err := s.conn.Exec(context.Background(), query, id)
+    query := fmt.Sprintf("delete from %s where id=$1 and owner_id=$2", tableName)
+    commandTag, err := s.conn.Exec(context.Background(), query, id, owner_id)
     if err != nil {
         return err
     }
