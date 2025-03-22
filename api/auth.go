@@ -118,7 +118,6 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
         http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
         return
     }
-    newUserId := retrievedUser.ID
 
     var expiration = time.Now().Add(20 * time.Minute)
     b := make([]byte, 16)
@@ -138,8 +137,7 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
         expiry: expiration,
     }
 
-    redirectUrl := "/data/user/" + strconv.FormatInt(newUserId, 10)
-    http.Redirect(w, r, redirectUrl, http.StatusTemporaryRedirect)
+    http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
