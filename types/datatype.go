@@ -4,31 +4,12 @@ import (
     "net/http"
 )
 
-var TypeStrings map[string]struct{} = map[string]struct{}{
-    "user": struct{}{},
-    "note": struct{}{},
-}
-
-var TypeStringToTableName map[string]string = map[string]string {
-    "user": "users",
-    "note": "notes",
-}
-
-var Decoders map[string]func(*http.Request) (DataType, error) = map[string]func(*http.Request) (DataType, error) {
-    "user": DecodeUserJson,
-    "note": DecodeNoteJson,
-}
-
-var QueryParsers map[string]map[string]func([]string) (Query, error) = map[string]map[string]func([]string) (Query, error) {
-    "user": UserQueries,
-    "note": NoteQueries,
-}
-
-var MetaData map[string]TypeMetaData = map[string]TypeMetaData {
+var MetaDataMap map[string]MetaData = map[string]MetaData {
     "note": NoteMeta,
     "user": UserMeta,
 }
 
+// data struct interface
 type DataType interface {
     IntoRow() []any
     Validate() bool
@@ -37,19 +18,25 @@ type DataType interface {
     GetOwnerId() int64
 }
 
-type TypeMetaData interface {
+// data type metadata interface
+type MetaData interface {
     TableName() string
     Fields() []string
     OwnerIdField() string
     IdField() string
+    GetDecoder() Decoder
+    GetQueries() Queries
 }
+type Decoder = func(*http.Request) (DataType, error)
+type Queries = map[string]func([]string) (Query, error)
 
 type Query interface {
     Sql() (string, map[string]any)
 }
 
+// turn data struct into a map from field names to values
 func SparseUpdate(dt DataType) map[string]any {
-    fields := MetaData[dt.TypeString()].Fields()
+    fields := MetaDataMap[dt.TypeString()].Fields()
     vals := dt.IntoRow()
     resultMap := make(map[string]any, 0)
     for i := 0; i < len(fields); i++ {

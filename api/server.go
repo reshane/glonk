@@ -62,16 +62,31 @@ func getOwnerIdFromRequestHeaders(r *http.Request) (int64, error) {
 }
 
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-    dataType := vars["dataType"]
-    if _, exists := types.TypeStrings[dataType]; !exists {
-        http.Error(w, "Not Found", http.StatusNotFound)
+    ownerId, err := getOwnerIdFromRequestHeaders(r)
+    if err != nil {
+        log.Println("Could not get ownerId from headers", err)
+        http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
 
-    data, err := types.Decoders[dataType](r)
+    vars := mux.Vars(r)
+    dataType := vars["dataType"]
+    metaData, exists := types.MetaDataMap[dataType]
+    if !exists {
+        log.Println("No metaData for specified data type:", dataType)
+        http.Error(w, "Not Found", http.StatusBadRequest)
+        return
+    }
+
+    data, err := metaData.GetDecoder()(r)
     if err != nil {
         log.Println(err)
+        http.Error(w, "Bad Request", http.StatusBadRequest)
+        return
+    }
+
+    if data.GetOwnerId() != ownerId {
+        log.Println("Session ownerId does not match data ownerId")
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
@@ -84,6 +99,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
     updated, err := s.db.Update(data)
     if err != nil {
+        log.Println(err)
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
@@ -93,16 +109,31 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-    dataType := vars["dataType"]
-    if _, exists := types.TypeStrings[dataType]; !exists {
-        http.Error(w, "Not Found", http.StatusNotFound)
+    ownerId, err := getOwnerIdFromRequestHeaders(r)
+    if err != nil {
+        log.Println("Could not get ownerId from headers", err)
+        http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
 
-    data, err := types.Decoders[dataType](r)
+    vars := mux.Vars(r)
+    dataType := vars["dataType"]
+    metaData, exists := types.MetaDataMap[dataType]
+    if !exists {
+        log.Println("No metaData for specified data type:", dataType)
+        http.Error(w, "Not Found", http.StatusBadRequest)
+        return
+    }
+
+    data, err := metaData.GetDecoder()(r)
     if err != nil {
         log.Println(err)
+        http.Error(w, "Bad Request", http.StatusBadRequest)
+        return
+    }
+
+    if data.GetOwnerId() != ownerId {
+        log.Println("Session ownerId does not match data ownerId")
         http.Error(w, "Bad Request", http.StatusBadRequest)
         return
     }
@@ -134,8 +165,10 @@ func (s *Server) handleDeleteByID(w http.ResponseWriter, r *http.Request) {
 
     vars := mux.Vars(r)
     dataType := vars["dataType"]
-    if _, exists := types.TypeStrings[dataType]; !exists {
-        http.Error(w, "Not Found", http.StatusNotFound)
+    metaData, exists := types.MetaDataMap[dataType]
+    if !exists {
+        log.Println("No metaData for specified data type:", dataType)
+        http.Error(w, "Not Found", http.StatusBadRequest)
         return
     }
 
@@ -146,7 +179,7 @@ func (s *Server) handleDeleteByID(w http.ResponseWriter, r *http.Request) {
     }
 
 
-    err = s.db.Delete(dataType, id, ownerId)
+    err = s.db.Delete(metaData, id, ownerId)
     if err != nil {
         http.Error(w, "Not Found", http.StatusNotFound)
         return
@@ -165,16 +198,14 @@ func (s *Server) handleGetByQueries(w http.ResponseWriter, r *http.Request) {
 
     vars := mux.Vars(r)
     dataType := vars["dataType"]
-    if _, exists := types.TypeStrings[dataType]; !exists {
-        http.Error(w, "Not Found", http.StatusNotFound)
+    metaData, exists := types.MetaDataMap[dataType]
+    if !exists {
+        log.Println("No metaData for specified data type:", dataType)
+        http.Error(w, "Not Found", http.StatusBadRequest)
         return
     }
 
-    parsers, exists := types.QueryParsers[dataType]
-    if !exists {
-        log.Println("Could not find query parsers for data type:", dataType)
-    }
-
+    parsers := metaData.GetQueries()
     queries := make([]types.Query, 0)
     for k, v := range r.URL.Query() {
         parser, exists := parsers[k]
@@ -190,7 +221,7 @@ func (s *Server) handleGetByQueries(w http.ResponseWriter, r *http.Request) {
         queries = append(queries, query)
     }
 
-    data, err := s.db.GetByQueries(dataType, queries, ownerId)
+    data, err := s.db.GetByQueries(metaData, queries, ownerId)
     if err != nil {
         log.Println("Could not find data:", err)
         http.Error(w, "Not Found", http.StatusNotFound)
@@ -210,8 +241,10 @@ func (s *Server) handleGetByID(w http.ResponseWriter, r *http.Request) {
 
     vars := mux.Vars(r)
     dataType := vars["dataType"]
-    if _, exists := types.TypeStrings[dataType]; !exists {
-        http.Error(w, "Not Found", http.StatusNotFound)
+    metaData, exists := types.MetaDataMap[dataType]
+    if !exists {
+        log.Println("No metaData for specified data type:", dataType)
+        http.Error(w, "Not Found", http.StatusBadRequest)
         return
     }
 
@@ -222,7 +255,7 @@ func (s *Server) handleGetByID(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    data, err := s.db.Get(dataType, id, ownerId)
+    data, err := s.db.Get(metaData, id, ownerId)
     if err != nil {
         log.Println("Could not find data:", err)
         http.Error(w, "Not Found", http.StatusNotFound)

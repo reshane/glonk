@@ -15,38 +15,6 @@ type Note struct {
     Contents string `json:"contents"`
 }
 
-// Note metadata
-type noteMeta struct{}
-var NoteMeta noteMeta
-
-func (noteMeta) OwnerIdField() string {
-    return "owner_id"
-}
-
-func (noteMeta) IdField() string {
-    return "id"
-}
-
-func (noteMeta) Fields() []string {
-    return noteFields
-}
-
-func (noteMeta) TableName() string {
-    return noteTableName
-}
-
-var (
-    NoteQueries = map[string]func([]string) (Query, error){
-        "byOwnerId": ByOwnerIdFromQueryParam,
-        "byContentContains": ByContentContainsFromQueryParam,
-    }
-    noteFields = []string{ "id", "owner_id", "contents" }
-    noteTableName = "notes"
-    noteTypeString = "note"
-)
-
-// DataType implementation for Note
-
 func (n Note) IntoRow() []any {
     return []any{ n.ID, n.OwnerId, n.Contents }
 }
@@ -74,7 +42,49 @@ func DecodeNoteJson(r *http.Request) (DataType, error) {
     return note, err
 }
 
+// Note metadata
+type noteMeta struct{}
+var NoteMeta noteMeta
+var (
+    NoteQueries = map[string]func([]string) (Query, error){
+        "byOwnerId": ByOwnerIdFromQueryParam,
+        "byContentContains": ByContentContainsFromQueryParam,
+    }
+    noteFields = []string{ "id", "owner_id", "contents" }
+    noteTableName = "notes"
+    noteTypeString = "note"
+    noteOwnerIdField = "owner_id"
+    noteIdField = "id"
+    noteDecoder = DecodeNoteJson
+)
+
+func (noteMeta) OwnerIdField() string {
+    return noteOwnerIdField
+}
+
+func (noteMeta) IdField() string {
+    return noteIdField
+}
+
+func (noteMeta) Fields() []string {
+    return noteFields
+}
+
+func (noteMeta) TableName() string {
+    return noteTableName
+}
+
+func (noteMeta) GetDecoder() Decoder {
+    return noteDecoder
+}
+
+func (noteMeta) GetQueries() Queries {
+    return NoteQueries
+}
+
 // Query types
+
+// OwnerId query
 type ByOwnerId struct {
     ownerIds []int64
 }
@@ -104,6 +114,7 @@ func (q *ByOwnerId) Sql() (string, map[string]any) {
     return strings.Join(clauses, " or "), args
 }
 
+// Contents Contains Query
 type ByContentContains struct {
     content string
 }

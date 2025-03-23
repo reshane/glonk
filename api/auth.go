@@ -142,7 +142,7 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
     guid := userInfo.Id
-    user, err := s.db.GetByGuid("user", "google/" + guid)
+    user, err := s.db.GetByGuid(types.UserMeta, "google/" + guid)
     if err != nil {
         if !errors.Is(err, pgx.ErrNoRows) {
             return nil, err
@@ -161,7 +161,7 @@ func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
             return nil, err
         }
 
-        user, err = s.db.GetByGuid("user", "google/" + guid)
+        user, err = s.db.GetByGuid(types.UserMeta, "google/" + guid)
         if err != nil {
             log.Println("Could not retreive user after create", err.Error())
             return nil, err
