@@ -188,13 +188,14 @@ func (s *Server) handleDeleteByID(w http.ResponseWriter, r *http.Request) {
     }
 
 
-    err = s.db.Delete(metaData, id, ownerId)
+    data, err := s.db.Delete(metaData, id, ownerId)
     if err != nil {
+        log.Println("Could not find data:", err)
         http.Error(w, "Not Found", http.StatusNotFound)
         return
     }
     w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(data)
 }
 
 func (s *Server) handleGetByQueries(w http.ResponseWriter, r *http.Request) {

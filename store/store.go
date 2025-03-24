@@ -11,6 +11,6 @@ type Store interface {
     GetByQueries(types.MetaData, []types.Query, int64) ([]types.DataType, error)
     Create(types.DataType) (types.DataType, error)
     Update(types.DataType) (types.DataType, error)
-    Delete(types.MetaData, int64, int64) (error)
+    Delete(types.MetaData, int64, int64) (types.DataType, error)
 }
 

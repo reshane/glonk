@@ -148,16 +148,13 @@
             });
 
         button.addEventListener('click', () => {
-            const requestUrl = buildUrl();
             const requestMethod = getSelectedMethod();
+            const requestUrl = buildUrl(requestMethod);
+            const request = buildRequest(requestMethod);
             console.log(requestMethod, requestUrl);
-            fetch(requestUrl, {
-                method: requestMethod, // or 'GET', 'PUT', 'DELETE'
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                // body: JSON.stringify({ key: 'value' }) // Only for methods with body (e.g., POST, PUT)
-            })
+            const responseArea = document.getElementById("responseData");
+            responseArea.replaceChildren();
+            fetch(requestUrl, request)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -166,7 +163,7 @@
                 })
                 .then(data => {
                     console.log('Success:', data);
-                    responseArea = document.getElementById("responseData");
+                    const responseArea = document.getElementById("responseData");
                     const dataString = JSON.stringify(data, null, 4);
                     responseArea.innerText = dataString;
                 })
@@ -174,6 +171,19 @@
                     console.error('Error:', error);
                 });
         });
+        function buildRequest(requestMethod) {
+            var request = {
+                method: requestMethod,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            if (requestMethod === "POST" || requestMethod === "PUT") {
+                request.body = getPrimaryInput();
+            }
+            console.log(request);
+            return request;
+        }
         function openMethod(evt, methodName) {
             var i, tabcontent, tablinks;
             tabcontent = document.getElementsByClassName("tabcontent");
@@ -204,14 +214,23 @@
             }
             return dataType;
         }
-        function buildUrl() {
+        function buildUrl(method) {
             const dataType = selectDataType();
             const queryParams = getActiveQueryValues();
+            const idString = getPrimaryInput();
             var url = "/data/" + dataType;
+            if (idString.length > 0 && (method === "GET" || method === "DELETE")) {
+                url += "/" + idString;
+            }
             if (queryParams.length > 0) {
                 url += queryParams;
             }
             return url;
+        }
+        function getPrimaryInput() {
+            const methods = document.getElementById("requestMethodSelection");
+            const active = methods.getElementsByClassName("tabcontent active");
+            return "" + active[0].getElementsByTagName('input')[0].value;
         }
         function getSelectedMethod() {
             const methods = document.getElementById("requestMethodSelection");
@@ -228,17 +247,19 @@
             const getQueries = document.getElementById("getQueries");
             const dataTypeQueries = getQueries.getElementsByClassName(dataType);
             var queriesString = "";
+            var activeQueryIdx = 0;
             for (var qIdx = 0; qIdx < dataTypeQueries.length; qIdx++) {
                 const input = dataTypeQueries[qIdx].getElementsByTagName('input')[0];
                 const queryName = input.name;
                 const queryVal = input.value;
                 if (queryVal.length > 0) {
-                    if (qIdx === 0) {
+                    if (activeQueryIdx === 0) {
                         queriesString += "?";
                     } else {
                         queriesString += "&";
                     }
                     queriesString += input.name + "=" + input.value;
+                    activeQueryIdx += 1;
                 }
             }
             return queriesString;

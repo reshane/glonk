@@ -152,26 +152,23 @@ func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
     }
     collector, exists := collectors[metaData.TableName()]
     if !exists {
-        log.Println("No collector function for specified data type:", dataType.TypeString())
+        log.Println("No collector function for specified table name:", metaData.TableName())
         return nil, errors.New("No collector function for specified data type")
     }
     data, err := pgx.CollectOneRow(rows, collector)
-    if err != nil {
-        log.Println("collector error:", err)
-    }
     return data, err
 }
 
-func (s *PsqlStore) Delete(metaData types.MetaData, id int64, owner_id int64) error {
+func (s *PsqlStore) Delete(metaData types.MetaData, id int64, owner_id int64) (types.DataType, error) {
     tableName := metaData.TableName()
-    query := fmt.Sprintf("delete from %s where id=$1 and owner_id=$2", tableName)
-    commandTag, err := s.conn.Exec(context.Background(), query, id, owner_id)
-    if err != nil {
-        return err
+    query := fmt.Sprintf("delete from %s where id=$1 and owner_id=$2 returning *", tableName)
+    rows, err := s.conn.Query(context.Background(), query, id, owner_id)
+    collector, exists := collectors[metaData.TableName()]
+    if !exists {
+        log.Println("No collector function for specified table name:", metaData.TableName())
+        return nil, errors.New("No collector function for specified data type")
     }
-    if commandTag.RowsAffected() != 1 {
-        return errors.New("No row found to delete")
-    }
-    return nil
+    data, err := pgx.CollectOneRow(rows, collector)
+    return data, err
 }
 
