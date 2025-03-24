@@ -8,17 +8,18 @@ import (
     "errors"
     "strings"
 
+    "github.com/jackc/pgx/v5/pgxpool"
     "github.com/jackc/pgx/v5"
 
     "github.com/reshane/glonk/types"
 )
 
 type PsqlStore struct {
-    conn *pgx.Conn
+    conn *pgxpool.Pool
 }
 
 func NewPsqlStore() (*PsqlStore, error) {
-    conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+    conn, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
     if err != nil {
         return nil, err
     }
@@ -27,7 +28,7 @@ func NewPsqlStore() (*PsqlStore, error) {
 
 var collectors map[string]func(pgx.CollectableRow) (types.DataType, error) = map[string]func(pgx.CollectableRow) (types.DataType, error) {
     types.UserMeta.TableName(): func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByName[types.User](cr); return res, err },
-    types.NoteMeta.TableName(): func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByPos[types.Note](cr); return res, err },
+    types.NoteMeta.TableName(): func (cr pgx.CollectableRow) (types.DataType, error) { res, err := pgx.RowToStructByName[types.Note](cr); return res, err },
 }
 
 func (s *PsqlStore) Get(metaData types.MetaData, id int64, ownerId int64) (types.DataType, error) {

@@ -43,12 +43,8 @@ func DecodeNoteJson(r *http.Request) (DataType, error) {
 }
 
 // Note metadata
-type noteMeta struct {
-    Queries []string `json:"queries"`
-}
-var NoteMeta noteMeta = noteMeta {
-    Queries: []string{ "byOwnerId", "byContentContains" },
-}
+type noteMeta struct {}
+var NoteMeta noteMeta = noteMeta {}
 var (
     NoteQueries = map[string]func([]string) (Query, error){
         "byOwnerId": ByOwnerIdFromQueryParam,
@@ -84,6 +80,10 @@ func (noteMeta) GetDecoder() Decoder {
 
 func (noteMeta) GetQueries() Queries {
     return NoteQueries
+}
+
+func (noteMeta) MarshalJSON() ([]byte, error) {
+    return MarshalMetaDataJSON(NoteMeta)
 }
 
 // Query types

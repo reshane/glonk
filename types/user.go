@@ -43,12 +43,8 @@ func DecodeUserJson(r *http.Request) (DataType, error) {
 
 
 // User metadata
-type userMeta struct {
-    Queries []string `json:"queries"`
-}
-var UserMeta userMeta = userMeta {
-    Queries: []string{},
-}
+type userMeta struct {}
+var UserMeta userMeta = userMeta {}
 var (
     UserQueries = map[string]func([]string) (Query, error){}
     userTableName = "users"
@@ -81,4 +77,6 @@ func (userMeta) GetQueries() Queries {
     return UserQueries
 }
 
-
+func (userMeta) MarshalJSON() ([]byte, error) {
+    return MarshalMetaDataJSON(UserMeta)
+}
