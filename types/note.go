@@ -43,8 +43,12 @@ func DecodeNoteJson(r *http.Request) (DataType, error) {
 }
 
 // Note metadata
-type noteMeta struct{}
-var NoteMeta noteMeta
+type noteMeta struct {
+    Queries []string `json:"queries"`
+}
+var NoteMeta noteMeta = noteMeta {
+    Queries: []string{ "byOwnerId", "byContentContains" },
+}
 var (
     NoteQueries = map[string]func([]string) (Query, error){
         "byOwnerId": ByOwnerIdFromQueryParam,

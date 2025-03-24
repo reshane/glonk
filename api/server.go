@@ -39,6 +39,10 @@ func (s *Server) Start() error {
     r.Handle("/data/{dataType}/{id}", isAuthorized(s.handleDeleteByID)).
         Methods("DELETE")
 
+    // schema
+    r.Handle("/schema", isAuthorized(s.schema)).
+        Methods("GET")
+
     // auth
     r.HandleFunc("/auth/google/login", s.googleLogin)
     r.HandleFunc("/auth/google/callback", s.googleCallback)
@@ -59,6 +63,11 @@ func getOwnerIdFromRequestHeaders(r *http.Request) (int64, error) {
         return -1, err
     }
     return ownerId, nil
+}
+
+func (s *Server) schema(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(types.MetaDataMap)
 }
 
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
