@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Glonk</title>
+        <link rel="icon" href="/favicon.ico"/>
+        <link rel="icon" href="/favicon-16x16.png" sizes="16x16">
+        <link rel="icon" href="/favicon-32x32.png" sizes="32x32">
+        <link rel="icon" href="/favicon-96x96.png" sizes="96x96">
+    </head>
+    <body>
+        <main>
+            <div>
+                <div>
+                    <div>
+                        <div>
+                            <a href="/auth/google/login" >
+                                Login with Google
+                            </a>
+                        </div>
+                        <br>
+                        <div id="data-container" style="display: none;">
+                            <div id="pfp" style="padding-top: 10px;">
+                            </div>
+                            <div id="pinfo">
+                            </div>
+                            <div id="requestMethodSelection">
+                                <div class="tab">
+                                    <button class="tablinks" onclick="openMethod(event, 'GET')">GET</button>
+                                    <button class="tablinks" onclick="openMethod(event, 'POST')">POST</button>
+                                    <button class="tablinks" onclick="openMethod(event, 'PUT')">PUT</button>
+                                    <button class="tablinks" onclick="openMethod(event, 'DELETE')">DELETE</button>
+                                </div>
+                                <div id="GET" class="tabcontent active" style="display: block;">
+                                    <p>GET</p>
+                                    <input type="number"/>
+                                    <div id="getQueries">
+                                    </div>
+                                </div>
+                                <div id="POST" class="tabcontent" style="display: none;">
+                                    <p>POST</p>
+                                    <input type="text"/>
+                                </div>
+                                <div id="PUT" class="tabcontent" style="display: none;">
+                                    <p>PUT</p>
+                                    <input type="text"/>
+                                </div>
+                                <div id="DELETE" class="tabcontent" style="display: none;">
+                                    <p>DELETE</p>
+                                    <input type="number"/>
+                                </div>
+                            </div>
+                            <select name="data type" id="dataTypes" onChange="selectDataType(this)">
+                            </select>
+                            <button id="myButton">
+                                Send Request
+                            </button>
+                            <div>
+                                <pre><code id="responseData"></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <script src="/index.js"></script>
+    </body>
+</html>

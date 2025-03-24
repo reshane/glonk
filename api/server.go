@@ -46,7 +46,9 @@ func (s *Server) Start() error {
     // auth
     r.HandleFunc("/auth/google/login", s.googleLogin)
     r.HandleFunc("/auth/google/callback", s.googleCallback)
-    r.Handle("/", http.FileServer(http.Dir("./templates")))
+
+    // static files
+    r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
 
     http.Handle("/", r)
     return http.ListenAndServe(s.listenAddr, nil)
