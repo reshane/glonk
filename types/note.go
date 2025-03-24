@@ -82,10 +82,6 @@ func (noteMeta) GetQueries() Queries {
     return NoteQueries
 }
 
-func (noteMeta) MarshalJSON() ([]byte, error) {
-    return MarshalMetaDataJSON(NoteMeta)
-}
-
 // Query types
 
 // OwnerId query

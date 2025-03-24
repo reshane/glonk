@@ -77,6 +77,3 @@ func (userMeta) GetQueries() Queries {
     return UserQueries
 }
 
-func (userMeta) MarshalJSON() ([]byte, error) {
-    return MarshalMetaDataJSON(UserMeta)
-}
