@@ -76,7 +76,6 @@
                 return response.json();
             })
             .then(schemaData => {
-                console.log(schemaData);
                 const dataTypes = document.getElementById("dataTypes");
                 dataTypes.replaceChildren();
                 const getQueries = document.getElementById("getQueries");
@@ -151,7 +150,6 @@
             const requestMethod = getSelectedMethod();
             const requestUrl = buildUrl(requestMethod);
             const request = buildRequest(requestMethod);
-            console.log(requestMethod, requestUrl);
             const responseArea = document.getElementById("responseData");
             responseArea.replaceChildren();
             fetch(requestUrl, request)
@@ -162,7 +160,7 @@
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Success:', data);
+                    // console.log('Success:', data);
                     const responseArea = document.getElementById("responseData");
                     const dataString = JSON.stringify(data, null, 4);
                     responseArea.innerText = dataString;
@@ -181,7 +179,6 @@
             if (requestMethod === "POST" || requestMethod === "PUT") {
                 request.body = getPrimaryInput();
             }
-            console.log(request);
             return request;
         }
         function openMethod(evt, methodName) {

@@ -106,7 +106,28 @@ func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
         return nil, errors.New("No metadata found for specified dataType")
     }
 
-    rows := [][]any{ dataType.IntoRow()[1:] }
+    values := dataType.IntoRow()[1:]
+    fields := metaData.Fields()[1:]
+    placeholders := make([]string, 0)
+    for i, _ := range fields {
+        placeholders = append(placeholders, fmt.Sprintf("$%d", i + 1))
+    }
+    fieldString := strings.Join(fields, ",")
+    placeholderString := strings.Join(placeholders, ",")
+
+    query := fmt.Sprintf("insert into %s (%s) values (%s) returning *", metaData.TableName(), fieldString, placeholderString)
+    rows, err := s.conn.Query(context.Background(), query, values...)
+    if err != nil {
+        return nil, err
+    }
+    collector, exists := collectors[metaData.TableName()]
+    if !exists {
+        log.Println("No collector function for specified table name:", metaData.TableName())
+        return nil, errors.New("No collector function for specified data type")
+    }
+    data, err := pgx.CollectOneRow(rows, collector)
+    return data, err
+    /*rows := [][]any{ dataType.IntoRow()[1:] }
     copyCount, err := s.conn.CopyFrom(
         context.Background(),
         pgx.Identifier{ metaData.TableName() },
@@ -119,7 +140,7 @@ func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
     if copyCount != 1 {
         return nil, errors.New("Could not create record")
     }
-    return dataType, nil
+    return dataType, nil*/
 }
 
 func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
