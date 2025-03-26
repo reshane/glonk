@@ -51,10 +51,6 @@ func (userMeta) TableName() string {
     return userTableName
 }
 
-func (userMeta) Fields() []string {
-    return userFields
-}
-
 func (userMeta) GetDecoder() Decoder {
     return DecodeUserJson
 }

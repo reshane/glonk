@@ -51,10 +51,6 @@ func (noteMeta) GetType() reflect.Type {
     return noteType
 }
 
-func (noteMeta) Fields() []string {
-    return noteFields
-}
-
 func (noteMeta) TableName() string {
     return noteTableName
 }

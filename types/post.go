@@ -47,10 +47,6 @@ func (postMeta) GetType() reflect.Type {
     return postType
 }
 
-func (postMeta) Fields() []string {
-    return postFields
-}
-
 func (postMeta) TableName() string {
     return postTableName
 }

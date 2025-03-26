@@ -164,23 +164,21 @@ func getAuthorIdCol(typ reflect.Type) (string, error) {
 }
 
 // glonk db functions
-func intoSqlFields(a any) ([]string, error) {
+func intoSqlFields(typ reflect.Type) ([]string, error) {
     colNames := []string{glonkIdTag}
     fields := map[string]string{}
-    typ := reflect.TypeOf(a)
-    val := reflect.ValueOf(a)
     for i := 0; i < typ.NumField(); i++ {
         if typ.Field(i).IsExported() {
             glonkName, err := getGlonkName(typ.Field(i))
             if err != nil {
-                return []string{}, errors.New("Could not get column name for " + val.Field(i).Type().Name())
+                return []string{}, errors.New("Could not get column name for " + typ.Field(i).Name)
             }
 
             if fieldName, exists := fields[glonkName]; exists {
-                return []string{}, errors.New("Fields " + fieldName + " and " + val.Field(i).Type().Name() + " are tagged with the same glonk name: " + glonkName)
+                return []string{}, errors.New("Fields " + fieldName + " and " + typ.Field(i).Name + " are tagged with the same glonk name: " + glonkName)
             }
             
-            fields[glonkName] = val.Field(i).Type().Name()
+            fields[glonkName] = typ.Field(i).Name
         }
     }
     if _, exists := fields[glonkIdTag]; exists {
@@ -229,7 +227,11 @@ func intoRow(a any) ([]any, error) {
 }
 
 func sparseUpdate(dt types.DataType) (map[string]any, error) {
-    fields := types.MetaDataMap[dt.TypeString()].Fields()
+    fields, err := intoSqlFields(reflect.TypeOf(dt))
+    if err != nil {
+        return nil, err
+    }
+
     vals, err := intoRow(dt)
     if err != nil {
         return nil, err

@@ -33,17 +33,28 @@ var collectors map[string]func(pgx.CollectableRow) (types.DataType, error) = map
 }
 
 func (s *PsqlStore) Get(metaData types.MetaData, id int64, ownerId int64) (types.DataType, error) {
+    dataType := metaData.GetType()
     tableName := metaData.TableName()
 
     finalArgs := []any{id}
-    clauses := "id = $1"
-    ownerIdCol, err := getOwnerIdCol(metaData.GetType())
+    fields, err := intoSqlFields(dataType)
     if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
+    clauses := "id = $1"
+    ownerIdCol, err := getOwnerIdCol(dataType)
+    if err == nil {
         clauses += " and " + ownerIdCol + " = $2"
         finalArgs = append(finalArgs, ownerId)
     }
+    authorIdCol, err := getAuthorIdCol(dataType)
+    if err == nil {
+        clauses += " and " + authorIdCol + " = $2"
+        finalArgs = append(finalArgs, ownerId)
+    }
 
-    query := fmt.Sprintf("select %s from %s where %s", strings.Join(metaData.Fields(), " , "), tableName, clauses)
+    query := fmt.Sprintf("select %s from %s where %s", strings.Join(fields, ","), tableName, clauses)
     rows, err := s.conn.Query(context.Background(), query, finalArgs...)
     if err != nil {
         return nil, err
@@ -52,12 +63,18 @@ func (s *PsqlStore) Get(metaData types.MetaData, id int64, ownerId int64) (types
     if !exists {
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := pgx.CollectOneRow(rows, collector)
-    return data, err
+    return pgx.CollectOneRow(rows, collector)
 }
 
 func (s *PsqlStore) GetByQueries(metaData types.MetaData, queries []types.Query, ownerId int64) ([]types.DataType, error) {
+    dataType := metaData.GetType()
     tableName := metaData.TableName()
+
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
     clauses := make([]string, 0)
     finalArgs := make([]any, 0)
     i := 1
@@ -81,10 +98,17 @@ func (s *PsqlStore) GetByQueries(metaData types.MetaData, queries []types.Query,
         ownerIdClause := fmt.Sprintf("%s = $%d", ownerIdCol, i)
         clauses = append(clauses, ownerIdClause)
         finalArgs = append(finalArgs, ownerId)
+        i += 1
+    }
+    authorIdCol, err := getAuthorIdCol(dataType)
+    if err == nil {
+        authorIdClause := fmt.Sprintf("%s = $%d", authorIdCol, i)
+        clauses = append(clauses, authorIdClause)
+        finalArgs = append(finalArgs, ownerId)
     }
 
 
-    query := fmt.Sprintf("select %s from %s", strings.Join(metaData.Fields(), " , "), tableName)
+    query := fmt.Sprintf("select %s from %s", strings.Join(fields, ","), tableName)
     if len(clauses) > 0 {
         query += " where " + strings.Join(clauses, " and ")
     }
@@ -96,13 +120,18 @@ func (s *PsqlStore) GetByQueries(metaData types.MetaData, queries []types.Query,
     if !exists {
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := pgx.CollectRows(rows, collector)
-    return data, err
+    return pgx.CollectRows(rows, collector)
 }
 
 func (s *PsqlStore) GetByGuid(metaData types.MetaData, guid string) (types.DataType, error) {
+    dataType := metaData.GetType()
     tableName := metaData.TableName()
-    query := fmt.Sprintf("select %s from %s where guid=$1", strings.Join(metaData.Fields(), " , "), tableName)
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
+    query := fmt.Sprintf("select %s from %s where guid=$1", strings.Join(fields, ","), tableName)
     rows, err := s.conn.Query(context.Background(), query, guid)
     if err != nil {
         return nil, err
@@ -111,22 +140,27 @@ func (s *PsqlStore) GetByGuid(metaData types.MetaData, guid string) (types.DataT
     if !exists {
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := pgx.CollectOneRow(rows, collector)
-    return data, err
+    return pgx.CollectOneRow(rows, collector)
 }
 
-func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
-    metaData, exists := types.MetaDataMap[dataType.TypeString()]
+func (s *PsqlStore) Create(data types.DataType) (types.DataType, error) {
+    metaData, exists := types.MetaDataMap[data.TypeString()]
     if !exists {
         return nil, errors.New("No metadata found for specified dataType")
     }
+    dataType := metaData.GetType()
 
-    rowVals, err := intoRow(dataType)
+    rowVals, err := intoRow(data)
     if err != nil {
         return nil, err
     }
     values := rowVals[1:]
-    fields := metaData.Fields()[1:]
+    allFields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
+    fields := allFields[1:]
     placeholders := make([]string, 0)
     for i, _ := range fields {
         placeholders = append(placeholders, fmt.Sprintf("$%d", i + 1))
@@ -144,8 +178,7 @@ func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
         log.Println("No collector function for specified table name:", metaData.TableName())
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := pgx.CollectOneRow(rows, collector)
-    return data, err
+    return pgx.CollectOneRow(rows, collector)
     // TODO: this pgx functionality should be used for a CreateMany function
     // change this to something like `insert into $1 ($2, $3...) values ($4, $5...) returning *;
     // and use the pgx.Query() function so that we can return the new value
@@ -165,13 +198,19 @@ func (s *PsqlStore) Create(dataType types.DataType) (types.DataType, error) {
     return dataType, nil*/
 }
 
-func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
-    metaData, exists := types.MetaDataMap[dataType.TypeString()]
+func (s *PsqlStore) Update(data types.DataType) (types.DataType, error) {
+    metaData, exists := types.MetaDataMap[data.TypeString()]
     if !exists {
         return nil, errors.New("No metadata found for specified dataType")
     }
+    dataType := metaData.GetType()
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
 
-    fieldMap, err := sparseUpdate(dataType)
+    fieldMap, err := sparseUpdate(data)
     if err != nil {
         return nil, err
     }
@@ -187,11 +226,11 @@ func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
             i += 1
         }
     }
-    values = append(values, GetId(dataType))
-    ownerIdValue, err := GetOwnerId(dataType)
+    values = append(values, GetId(data))
+    ownerIdValue, err := GetOwnerId(data)
     authorOwnerField := "owner_id"
     if err != nil {
-        ownerIdValue, err = GetAuthorId(dataType)
+        ownerIdValue, err = GetAuthorId(data)
         if err != nil {
             return nil, err
         }
@@ -200,7 +239,7 @@ func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
     values = append(values, ownerIdValue)
     fieldSetString := strings.Join(setStrings, ", ")
 
-    query := fmt.Sprintf("update %s set %s where id = $%d and %s = $%d returning %s", tableName, fieldSetString, i, authorOwnerField, i + 1, strings.Join(metaData.Fields(), ","))
+    query := fmt.Sprintf("update %s set %s where id = $%d and %s = $%d returning %s", tableName, fieldSetString, i, authorOwnerField, i + 1, strings.Join(fields, ","))
     rows, err := s.conn.Query(context.Background(), query, values...)
     if err != nil {
         return nil, err
@@ -210,20 +249,21 @@ func (s *PsqlStore) Update(dataType types.DataType) (types.DataType, error) {
         log.Println("No collector function for specified table name:", metaData.TableName())
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := pgx.CollectOneRow(rows, collector)
-    return data, err
+    return pgx.CollectOneRow(rows, collector)
 }
 
 func (s *PsqlStore) Delete(metaData types.MetaData, id int64, owner_id int64) (types.DataType, error) {
     tableName := metaData.TableName()
     query := fmt.Sprintf("delete from %s where id=$1 and owner_id=$2 returning *", tableName)
     rows, err := s.conn.Query(context.Background(), query, id, owner_id)
+    if err != nil {
+        return nil, err
+    }
     collector, exists := collectors[metaData.TableName()]
     if !exists {
         log.Println("No collector function for specified table name:", metaData.TableName())
         return nil, errors.New("No collector function for specified data type")
     }
-    data, err := pgx.CollectOneRow(rows, collector)
-    return data, err
+    return pgx.CollectOneRow(rows, collector)
 }
 

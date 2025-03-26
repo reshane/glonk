@@ -35,7 +35,6 @@ type DataType interface {
 type MetaData interface {
     GetType() reflect.Type
     TableName() string
-    Fields() []string
     GetDecoder() Decoder
     GetQueries() Queries
 }
