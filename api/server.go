@@ -96,9 +96,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if data.GetOwnerId() != ownerId {
-        log.Println("Session ownerId does not match data ownerId")
-        http.Error(w, "Bad Request", http.StatusBadRequest)
+    if !validateWrite(data, ownerId, w) {
         return
     }
 
@@ -117,6 +115,32 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(updated)
+}
+
+func validateWrite(data types.DataType, ownerId int64, w http.ResponseWriter) bool {
+    writerIdentifierExists := false
+    dataOwnerId, err := store.GetOwnerId(data)
+    if err == nil {
+        writerIdentifierExists = true
+        if dataOwnerId != ownerId {
+            log.Println("Session ownerId does not match data ownerId")
+            http.Error(w, "Not Authorized", http.StatusUnauthorized)
+            return false
+        }
+    }
+    if writerIdentifierExists {
+        return true
+    }
+    dataAuthorId, err := store.GetAuthorId(data)
+    if err == nil {
+        writerIdentifierExists = true
+        if dataAuthorId != ownerId {
+            log.Println("Session ownerId does not match data authorId")
+            http.Error(w, "Not Authorized", http.StatusUnauthorized)
+            return false
+        }
+    }
+    return writerIdentifierExists
 }
 
 func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -143,9 +167,8 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if data.GetOwnerId() != ownerId {
-        log.Println("Session ownerId does not match data ownerId")
-        http.Error(w, "Bad Request", http.StatusBadRequest)
+    if !validateWrite(data, ownerId, w) {
+        log.Println("Invalid write")
         return
     }
 
@@ -217,15 +240,15 @@ func (s *Server) handleGetByQueries(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    parsers := metaData.GetQueries()
+    builders := metaData.GetQueries()
     queries := make([]types.Query, 0)
     for k, v := range r.URL.Query() {
-        parser, exists := parsers[k]
+        builder, exists := builders[k]
         if !exists {
             log.Printf("Could not find query %s for data type %s\n", k, dataType)
             continue
         }
-        query, err := parser(v)
+        query, err := builder.Parser(builder.Field, v)
         if err != nil {
             log.Printf("Error parsing query param %s for query %s: %v\n", v, k, err)
             continue

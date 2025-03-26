@@ -1,6 +1,8 @@
 -- @COMMAND
 DROP TABLE IF EXISTS notes;
 -- @COMMAND
+DROP TABLE IF EXISTS posts;
+-- @COMMAND
 DROP TABLE IF EXISTS users;
 -- @COMMAND
 -- users table
@@ -22,3 +24,12 @@ CREATE TABLE notes(
 );
 --@COMMAND
 CREATE INDEX notes_owner_id on notes (owner_id);
+-- @COMMAND
+-- posts table
+CREATE TABLE posts(
+    id SERIAL PRIMARY KEY,
+    author_id INT references users(id),
+    contents TEXT
+);
+--@COMMAND
+CREATE INDEX posts_author_id on posts (author_id);

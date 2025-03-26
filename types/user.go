@@ -2,32 +2,21 @@ package types
 
 import (
     "net/http"
+    "reflect"
     "encoding/json"
 )
 
 // User data type
 type User struct {
-    ID int64 `json:"id"`
-    Guid string `json:"guid"`
-    Name string `json:"name"`
-    Email string `json:"email"`
-    Picture string `json:"picture"`
-}
-
-func (u User) IntoRow() []any {
-    return []any{ u.ID, u.Guid, u.Name, u.Email, u.Picture }
+    ID int64 `json:"id" glonk:"id,owner_id"`
+    Guid string `json:"guid" glonk:"guid"`
+    Name string `json:"name" glonk:"name"`
+    Email string `json:"email" glonk:"email"`
+    Picture string `json:"picture" glonk:"picture"`
 }
 
 func (u User) TypeString() string {
     return userTypeString
-}
-
-func (u User) GetId() int64 {
-    return u.ID
-}
-
-func (u User) GetOwnerId() int64 {
-    return u.ID
 }
 
 func (u User) Validate() bool {
@@ -46,19 +35,16 @@ func DecodeUserJson(r *http.Request) (DataType, error) {
 type userMeta struct {}
 var UserMeta userMeta = userMeta {}
 var (
-    UserQueries = map[string]func([]string) (Query, error){}
+    UserQueries = Queries {}
     userTableName = "users"
     userFields = []string{ "id", "guid", "name", "email", "picture" }
     userTypeString = "user"
     userDecoder = DecodeUserJson
+    userType = reflect.TypeOf(User{})
 )
 
-func (userMeta) OwnerIdField() string {
-    return "id"
-}
-
-func (userMeta) IdField() string {
-    return "id"
+func (userMeta) GetType() reflect.Type {
+    return userType
 }
 
 func (userMeta) TableName() string {
