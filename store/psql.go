@@ -100,13 +100,6 @@ func (s *PsqlStore) GetByQueries(metaData types.MetaData, queries []types.Query,
         finalArgs = append(finalArgs, ownerId)
         i += 1
     }
-    authorIdCol, err := getAuthorIdCol(dataType)
-    if err == nil {
-        authorIdClause := fmt.Sprintf("%s = $%d", authorIdCol, i)
-        clauses = append(clauses, authorIdClause)
-        finalArgs = append(finalArgs, ownerId)
-    }
-
 
     query := fmt.Sprintf("select %s from %s", strings.Join(fields, ","), tableName)
     if len(clauses) > 0 {
@@ -254,7 +247,17 @@ func (s *PsqlStore) Update(data types.DataType) (types.DataType, error) {
 
 func (s *PsqlStore) Delete(metaData types.MetaData, id int64, owner_id int64) (types.DataType, error) {
     tableName := metaData.TableName()
-    query := fmt.Sprintf("delete from %s where id=$1 and owner_id=$2 returning *", tableName)
+    dataType := metaData.GetType()
+
+    col, err := getOwnerIdCol(dataType)
+    if err != nil {
+        col, err = getAuthorIdCol(dataType)
+        if err != nil {
+            return nil, err
+        }
+    }
+
+    query := fmt.Sprintf("delete from %s where id=$1 and %s=$2 returning *", tableName, col)
     rows, err := s.conn.Query(context.Background(), query, id, owner_id)
     if err != nil {
         return nil, err

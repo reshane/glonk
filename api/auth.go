@@ -155,17 +155,11 @@ func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
             Picture: userInfo.Picture,
         }
         log.Println("Creating new user", newUser)
-        _, err := s.db.Create(newUser)
+        user, err = s.db.Create(newUser)
         if err != nil {
             log.Println("Error creating new user:", err.Error())
             return nil, err
         }
-
-        user, err = s.db.GetByGuid(types.UserMeta, "google/" + guid)
-        if err != nil {
-            log.Println("Could not retreive user after create", err.Error())
-            return nil, err
-        } 
     }
     retreivedUser := user.(types.User)
     return &retreivedUser, nil
