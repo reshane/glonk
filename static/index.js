@@ -3,7 +3,7 @@ const allCookies = document.cookie;
 const dataContainer = document.getElementById("data-container");
 
 // Get the Schema for the queries
-fetch('http://localhost:8080/schema', {
+fetch('/schema', {
     method: 'GET', // or 'GET', 'PUT', 'DELETE'
     headers: {
         'Content-Type': 'application/json'
@@ -52,7 +52,7 @@ fetch('http://localhost:8080/schema', {
     });
 
 // Get the user data
-fetch('http://localhost:8080/data/user', {
+fetch('/data/user', {
     method: 'GET', // or 'GET', 'PUT', 'DELETE'
     headers: {
         'Content-Type': 'application/json'

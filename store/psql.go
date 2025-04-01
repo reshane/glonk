@@ -48,11 +48,6 @@ func (s *PsqlStore) Get(metaData types.MetaData, id int64, ownerId int64) (types
         clauses += " and " + ownerIdCol + " = $2"
         finalArgs = append(finalArgs, ownerId)
     }
-    authorIdCol, err := getAuthorIdCol(dataType)
-    if err == nil {
-        clauses += " and " + authorIdCol + " = $2"
-        finalArgs = append(finalArgs, ownerId)
-    }
 
     query := fmt.Sprintf("select %s from %s where %s", strings.Join(fields, ","), tableName, clauses)
     rows, err := s.conn.Query(context.Background(), query, finalArgs...)

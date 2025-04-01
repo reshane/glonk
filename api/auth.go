@@ -46,7 +46,7 @@ var (
 
     // google oauth config
     cfg = &oauth2.Config{
-        RedirectURL: "http://localhost:8080/auth/google/callback",
+        RedirectURL: "https://glonk-api-696087975299.northamerica-northeast1.run.app/auth/google/callback",
         ClientID: os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
         ClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
         Scopes: []string{"email", "profile"},
