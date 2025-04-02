@@ -44,6 +44,7 @@ func (s *Server) Start() error {
         Methods("GET")
 
     // auth
+    r.Handle("/auth/logout", isAuthorized(s.logout))
     r.HandleFunc("/auth/google/login", s.googleLogin)
     r.HandleFunc("/auth/google/callback", s.googleCallback)
 

@@ -46,7 +46,7 @@ var (
 
     // google oauth config
     cfg = &oauth2.Config{
-        RedirectURL: "https://glonk-api-696087975299.northamerica-northeast1.run.app/auth/google/callback",
+        RedirectURL: os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
         ClientID: os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
         ClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
         Scopes: []string{"email", "profile"},
@@ -80,7 +80,28 @@ func isAuthorized(endpoint func(http.ResponseWriter, *http.Request)) http.Handle
     })
 }
 
-// loging endpoint & callback
+// logout - general across accounts
+func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
+    sessionId, err := r.Cookie("session_id")
+    if err == nil {
+        _, exists := sessions[sessionId.Value]
+        if exists {
+            delete(sessions, sessionId.Value)
+        }
+    }
+    cookie := http.Cookie{
+        Name: "session_id",
+        Value: "",
+        Path: "/",
+        HttpOnly: true,
+        Expires: time.Unix(0, 0),
+    }
+    http.SetCookie(w, &cookie)
+    http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+}
+
+
+// login endpoint & callback
 func (s *Server) googleLogin(w http.ResponseWriter, r *http.Request) {
     oauthState := generateStateCookie(w)
     u := cfg.AuthCodeURL(oauthState)
