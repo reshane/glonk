@@ -12,7 +12,8 @@ func main() {
     listenAddr := flag.String("listenaddr", ":8080", "The server address")
     flag.Parse()
 
-    db, err := store.NewPsqlStore()
+    // db, err := store.NewPsqlStore()
+	db, err := store.NewSqliteStore()
     if err != nil {
         log.Fatalf("Could not create db connection: %v", err)
     }

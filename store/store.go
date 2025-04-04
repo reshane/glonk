@@ -1,9 +1,11 @@
 package store
 
 import (
+	"log"
     "reflect"
     "errors"
     "strings"
+	"database/sql"
     "github.com/reshane/glonk/types"
 )
 
@@ -226,6 +228,44 @@ func intoRow(a any) ([]any, error) {
     return row, nil
 }
 
+func scanType(rows *sql.Rows, dt reflect.Type) ([]types.DataType, error) {
+	fieldVals := make([]any, 0)
+	for i := 0; i < dt.NumField(); i++ {
+		reciever := reflect.New(dt.Field(i).Type)
+		fieldVals = append(fieldVals, reciever.Elem().Interface())
+	}
+
+	fieldRefs := make([]any, 0)
+	for i, _ := range fieldVals {
+		fieldRefs = append(fieldRefs, &fieldVals[i])
+	}
+
+	data := make([]types.DataType, 0)
+	for rows.Next() {
+		targetDataPtr := reflect.New(dt)
+		targetData := targetDataPtr.Elem()
+		rows.Scan(fieldRefs...)
+		for i, val := range fieldRefs {
+			elem := reflect.ValueOf(val).Elem().Interface()
+			switch t := elem.(type) {
+			case int64:
+				targetData.Field(i).Set(reflect.ValueOf(t))
+			case float64:
+				targetData.Field(i).Set(reflect.ValueOf(t))
+			case string:
+				targetData.Field(i).Set(reflect.ValueOf(t))
+			default:
+				log.Println("missing type", reflect.TypeOf(t))
+			}
+		}
+		td, ok := targetData.Interface().(types.DataType)
+		if ok {
+			data = append(data, td)
+		}
+	}
+	return data, nil
+}
+
 func sparseUpdate(dt types.DataType) (map[string]any, error) {
     fields, err := intoSqlFields(reflect.TypeOf(dt))
     if err != nil {
@@ -243,4 +283,9 @@ func sparseUpdate(dt types.DataType) (map[string]any, error) {
         }
     }
     return resultMap, nil
+}
+
+type NoRows struct {}
+func (NoRows) Error() string {
+	return "No rows found"
 }

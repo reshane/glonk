@@ -19,6 +19,7 @@ import (
     "github.com/jackc/pgx/v5"
 
     "github.com/reshane/glonk/types"
+    "github.com/reshane/glonk/store"
 )
 
 // session struct
@@ -165,7 +166,7 @@ func (s *Server) retreiveOrCreateUser(userInfo *UserInfo) (*types.User, error) {
     guid := userInfo.Id
     user, err := s.db.GetByGuid(types.UserMeta, "google/" + guid)
     if err != nil {
-        if !errors.Is(err, pgx.ErrNoRows) {
+        if !errors.Is(err, pgx.ErrNoRows) && !errors.Is(err, store.NoRows{}) {
             return nil, err
         }
 
