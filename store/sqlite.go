@@ -28,12 +28,17 @@ func NewSqliteStore() (*SqliteStore, error) {
 func (s *SqliteStore) Get(metaData types.MetaData, id int64, owner_id int64) (types.DataType, error) {
 	dataType := metaData.GetType()
 	tableName := metaData.TableName()
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
 
-	query := fmt.Sprintf("SELECT * FROM %s where id = (?)", tableName)
+	query := fmt.Sprintf("SELECT %s FROM %s where id = (?)", strings.Join(fields, ","), tableName)
 	vals := []any{id}
     ownerIdCol, err := getOwnerIdCol(metaData.GetType())
     if err == nil {
-		query = fmt.Sprintf("SELECT * FROM %s where id = (?) and %s = (?)", tableName, ownerIdCol)
+		query += fmt.Sprintf(" and %s = (?)", ownerIdCol)
 		vals = append(vals, owner_id)
     }
 
@@ -60,7 +65,12 @@ func (s *SqliteStore) Get(metaData types.MetaData, id int64, owner_id int64) (ty
 func (s *SqliteStore) GetByGuid(metaData types.MetaData, guid string) (types.DataType, error) {
 	dataType := metaData.GetType()
 	tableName := metaData.TableName()
-	query := fmt.Sprintf("SELECT * FROM %s where guid = (?)", tableName)
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
+	query := fmt.Sprintf("SELECT %s FROM %s where guid = (?)", strings.Join(fields, ","), tableName)
 	statement, err := s.conn.Prepare(query)
 	rows, err := statement.Query(guid)
 	if err != nil {
@@ -81,22 +91,41 @@ func (s *SqliteStore) GetByGuid(metaData types.MetaData, guid string) (types.Dat
 	return data[0], nil
 }
 
-func (s *SqliteStore) GetByQueries(metaData types.MetaData, _queries []types.Query, owner_id int64) ([]types.DataType, error) {
-	// TODO: get queries working
-	dataType := metaData.GetType()
-	tableName := metaData.TableName()
+func (s *SqliteStore) GetByQueries(metaData types.MetaData, queries []types.Query, ownerId int64) ([]types.DataType, error) {
+    dataType := metaData.GetType()
+    tableName := metaData.TableName()
 
-	query := fmt.Sprintf("SELECT * FROM %s", tableName)
-	vals := make([]any, 0)
-    ownerIdCol, err := getOwnerIdCol(metaData.GetType())
-    if err == nil {
-		query = fmt.Sprintf("SELECT * FROM %s where %s = (?)", tableName, ownerIdCol)
-		vals = append(vals, owner_id)
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
+    clauses := make([]string, 0)
+    finalArgs := make([]any, 0)
+    for _, query := range queries {
+        clause, args := query.Sql()
+        for k, v := range args {
+            named := fmt.Sprintf("@%s", k)
+            clause = strings.Replace(clause, named, "?", -1)
+            finalArgs = append(finalArgs, v)
+        }
+        clauses = append(clauses, "(" + clause + ")")
     }
 
+    ownerIdCol, err := getOwnerIdCol(metaData.GetType())
+    if err == nil {
+        ownerIdClause := fmt.Sprintf("%s = ?", ownerIdCol)
+        clauses = append(clauses, ownerIdClause)
+        finalArgs = append(finalArgs, ownerId)
+    }
+
+    query := fmt.Sprintf("select %s from %s", strings.Join(fields, ","), tableName)
+    if len(clauses) > 0 {
+        query += " where " + strings.Join(clauses, " and ")
+    }
 	statement, err := s.conn.Prepare(query)
 
-	rows, err := statement.Query(vals...)
+	rows, err := statement.Query(finalArgs...)
 	if err != nil {
 		log.Println(err.Error())
 		return nil, err
@@ -110,7 +139,6 @@ func (s *SqliteStore) GetByQueries(metaData types.MetaData, _queries []types.Que
 }
 
 func (s *SqliteStore) Create(data types.DataType) (types.DataType, error) {
-	log.Println(data)
     metaData, exists := types.MetaDataMap[data.TypeString()]
     if !exists {
         return nil, errors.New("No metadata found for specified dataType")
@@ -136,7 +164,7 @@ func (s *SqliteStore) Create(data types.DataType) (types.DataType, error) {
     fieldString := strings.Join(fields, ",")
     placeholderString := strings.Join(placeholders, ",")
 
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING *", tableName, fieldString, placeholderString)
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING %s", tableName, fieldString, placeholderString, strings.Join(allFields, ","))
 	statement, err := s.conn.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -158,8 +186,62 @@ func (s *SqliteStore) Create(data types.DataType) (types.DataType, error) {
 }
 
 func (s *SqliteStore) Update(data types.DataType) (types.DataType, error) {
-	// TODO: get sparse updates working
-	return nil, errors.New("Unimplemented")
+    metaData, exists := types.MetaDataMap[data.TypeString()]
+    if !exists {
+        return nil, errors.New("No metadata found for specified dataType")
+    }
+    dataType := metaData.GetType()
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
+
+    fieldMap, err := sparseUpdate(data)
+    if err != nil {
+        return nil, err
+    }
+    tableName := metaData.TableName()
+
+    setStrings := make([]string, 0)
+    values := make([]any, 0)
+    var i int = 1
+    for field, val := range fieldMap {
+        if field != glonkIdTag && field != glonkOwnerIdTag {
+            setStrings = append(setStrings, fmt.Sprintf("%s = $%d", field, i))
+            values = append(values, val)
+            i += 1
+        }
+    }
+    values = append(values, GetId(data))
+    ownerIdValue, err := GetOwnerId(data)
+    authorOwnerField := "owner_id"
+    if err != nil {
+        ownerIdValue, err = GetAuthorId(data)
+        if err != nil {
+            return nil, err
+        }
+        authorOwnerField = "author_id"
+    }
+    values = append(values, ownerIdValue)
+    fieldSetString := strings.Join(setStrings, ", ")
+
+    query := fmt.Sprintf("update %s set %s where id = $%d and %s = $%d returning %s", tableName, fieldSetString, i, authorOwnerField, i + 1, strings.Join(fields, ","))
+	statement, err := s.conn.Prepare(query)
+	rows, err := statement.Query(values...)
+	if err != nil {
+		log.Println(err.Error())
+		return nil, err
+	}
+
+	updated, err := scanType(rows, dataType)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) != 1 {
+		return nil, errors.New(fmt.Sprintf("Multiple (%d) entries updated for id: %d, owner_id: %d", len(updated), GetId(data), ownerIdValue))
+	}
+	return updated[0], nil
 }
 
 func (s *SqliteStore) Delete(metaData types.MetaData, id int64, owner_id int64) (types.DataType, error) {
@@ -168,7 +250,12 @@ func (s *SqliteStore) Delete(metaData types.MetaData, id int64, owner_id int64) 
 	// reporting multiple entries were deleted
 	dataType := metaData.GetType()
 	tableName := metaData.TableName()
-	query := fmt.Sprintf("DELETE FROM %s where id = (?) and owner_id = (?) returning *", tableName)
+    fields, err := intoSqlFields(dataType)
+    if err != nil {
+        log.Println("Could not retreive sql fields for ", dataType)
+        return nil, err
+    }
+	query := fmt.Sprintf("DELETE FROM %s where id = (?) and owner_id = (?) returning %s", tableName, strings.Join(fields, ","))
 	statement, err := s.conn.Prepare(query)
 	rows, err := statement.Query(id, owner_id)
 	if err != nil {
