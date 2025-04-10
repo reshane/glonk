@@ -1,0 +1,41 @@
+body {
+    font-family: serif;
+    font-size: 16px;
+    padding: 5px;
+    margin: 5px;
+}
+
+.tablinks.active {
+    background-color: white;
+    color: blue;
+    border-radius: 5px;
+    transition: 0.1s;
+}
+
+.dataTypesSelect {
+    cursor: pointer; /* change the mouse cursor icon */
+    border-radius: 5px; /* round the border corners */
+    padding: 3px 3px;
+    width: 100px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.jsonInput {
+    height: 100px;
+    width: 400px;
+}
+
+.glonkImage {
+    transition: 0.4s;
+}
+
+.glonkImage:hover {
+    transform: rotate(45deg);
+    transition: 0.4s;
+}
+
+.glonkImage:active {
+    border-radius: 50%;
+    transition: 0.4s;
+}

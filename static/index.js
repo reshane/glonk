@@ -21,6 +21,13 @@ fetch('/schema', {
         dataTypes.replaceChildren();
         const getQueries = document.getElementById("getQueries");
         getQueries.replaceChildren();
+        const queriesLabel = document.createElement("label");
+        const queriesContainer = document.createElement("div");
+        queriesContainer.id = "queriesInner";
+        queriesLabel.for = queriesContainer.id;
+        queriesLabel.innerText = "Queries:";
+        getQueries.appendChild(queriesLabel);
+        getQueries.appendChild(queriesContainer);
         for (var dataType in schemaData) {
             const dataTypeOpt = document.createElement("option");
             dataTypeOpt.value = dataType;
@@ -33,16 +40,15 @@ fetch('/schema', {
                 const queryContainer = document.createElement("div");
                 queryContainer.className = dataType;
                 queryContainer.id = query;
-                queryContainer.style = "display: none;";
                 const queryLabel = document.createElement("label");
                 queryLabel.for = query;
-                queryLabel.innerText = query;
+                queryLabel.innerText = query + ": ";
                 const queryInput = document.createElement("input");
                 queryInput.type = "text";
                 queryInput.name = query;
                 queryContainer.appendChild(queryLabel);
                 queryContainer.appendChild(queryInput);
-                getQueries.appendChild(queryContainer);
+                queriesContainer.appendChild(queryContainer);
             }
         }
         selectDataType();
@@ -66,6 +72,8 @@ fetch('/data/user', {
         return response.json();
     })
     .then(data => {
+        document.getElementById("logout").style = "display: block;";
+        document.getElementById("googleLogin").style = "display: none;";
         document.getElementById("data-container").style = "display: block;";
         pfp = document.getElementById("pfp");
         pfp.replaceChildren();
@@ -89,7 +97,7 @@ fetch('/data/user', {
     });
 
 // Send requests on button click
-const button = document.getElementById('myButton');
+const button = document.getElementById('sendRequestButton');
 button.addEventListener('click', () => {
     const requestMethod = getSelectedMethod();
     const requestUrl = buildUrl(requestMethod);
@@ -162,7 +170,7 @@ function getActiveQueryValues() {
     const selectObj = document.getElementById("dataTypes");
     var idx = selectObj.selectedIndex;
     var dataType = selectObj[idx].value;
-    const getQueries = document.getElementById("getQueries");
+    const getQueries = document.getElementById("queriesInner");
     const dataTypeQueries = getQueries.getElementsByClassName(dataType);
     var queriesString = "";
     var activeQueryIdx = 0;
@@ -188,7 +196,7 @@ function selectDataType() {
     const selectObj = document.getElementById("dataTypes");
     var idx = selectObj.selectedIndex;
     var dataType = selectObj[idx].value;
-    const getQueries = document.getElementById("getQueries");
+    const getQueries = document.getElementById("queriesInner");
     const getQueriesChildren = getQueries.children;
     for (var qIdx = 0; qIdx < getQueriesChildren.length; qIdx++) {
         getQueriesChildren[qIdx].style.display = "none";
@@ -202,6 +210,13 @@ function selectDataType() {
 
 function openMethod(evt, methodName) {
     var i, tabcontent, tablinks;
+    const getQueries = document.getElementById("getQueries");
+    if (methodName === "GET") {
+        getQueries.style.display = "block";
+    }
+    else {
+        getQueries.style.display = "none";
+    }
     tabcontent = document.getElementsByClassName("tabcontent");
     for (i = 0; i < tabcontent.length; i++) {
         tabcontent[i].style.display = "none";

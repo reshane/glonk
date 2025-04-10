@@ -6,59 +6,81 @@
         <link rel="icon" href="/favicon-16x16.png" sizes="16x16">
         <link rel="icon" href="/favicon-32x32.png" sizes="32x32">
         <link rel="icon" href="/favicon-96x96.png" sizes="96x96">
+        <link rel="stylesheet" type="text/css" href="/style.css">
     </head>
     <body>
         <main>
             <div>
                 <div>
-                    <div>
-                        <div>
-                            <a href="/auth/google/login" >
+                    <div style="padding-left: 5px";>
+                        <div id="googleLogin" style="display: block; padding-left: 5px;">
+                            <a href="/auth/google/login">
                                 Login with Google
                             </a>
                         </div>
-                        <div>
-                            <a href="/auth/logout" >
+                        <div id="logout" style="display: none; padding-left: 5px;">
+                            <a href="/auth/logout">
                                 Logout
                             </a>
                         </div>
                         <br>
-                        <div id="data-container" style="display: none;">
-                            <div id="pfp" style="padding-top: 10px;">
-                            </div>
-                            <div id="pinfo">
-                            </div>
-                            <div id="requestMethodSelection">
-                                <div class="tab">
-                                    <button class="tablinks" onclick="openMethod(event, 'GET')">GET</button>
-                                    <button class="tablinks" onclick="openMethod(event, 'POST')">POST</button>
-                                    <button class="tablinks" onclick="openMethod(event, 'PUT')">PUT</button>
-                                    <button class="tablinks" onclick="openMethod(event, 'DELETE')">DELETE</button>
+                        <div id="data-container" style="display: none; padding: 10px; transition: 0.4s;">
+                            <div style="display: flex; flex-direction: row; padding-top: 10px;">
+                                <div style="padding-right: 10px;">
+                                    <img class="glonkImage" src="/favicon.ico" alt="glonk image"/>
                                 </div>
-                                <div id="GET" class="tabcontent active" style="display: block;">
-                                    <p>GET</p>
-                                    <input type="number"/>
-                                    <div id="getQueries">
+                            </div>
+                            <div style="display: flex; flex-direction: row; padding-top: 20px; padding-bottom: 20px;">
+                                <div id="pfp">
+                                </div>
+                                <div id="pinfo" style="padding-left: 20px;">
+                                </div>
+                            </div>
+                            <div id="queryBuilder" style="display: flex; flex-direction: column;">
+                                <div style="display: flex; flex-direction: row;">
+                                    <div style="display: flex; flex-direction: row; padding: 5px;">
+                                        <label for="dataTypes">Endpoint:</label>
+                                        <select class="dataTypesSelect" name="data type" id="dataTypes" onChange="selectDataType(this)">
+                                        </select>
+                                    </div>
+                                    <div style="display: flex; flex-direction: row; padding: 5px;">
+                                        <label id="methodLabel" for="requestMethodSelection">Method:</label>
+                                        <div
+                                            <div class="tab">
+                                                <button class="tablinks active" onclick="openMethod(event, 'GET')">GET</button>
+                                                <button class="tablinks" onclick="openMethod(event, 'POST')">POST</button>
+                                                <button class="tablinks" onclick="openMethod(event, 'PUT')">PUT</button>
+                                                <button class="tablinks" onclick="openMethod(event, 'DELETE')">DELETE</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div id="POST" class="tabcontent" style="display: none;">
-                                    <p>POST</p>
-                                    <input type="text"/>
+                                <div style="display: flex; flex-direction: row; padding-top: 10px; padding-bottom: 10px;">
+                                    <div id="requestMethodSelection" style="padding: 5px">
+                                        <div id="GET" class="tabcontent active" style="display: block;">
+                                            <label for="getId">ID:</label>
+                                            <input id="getId" type="number"/>
+                                        </div>
+                                        <div id="POST" class="tabcontent" style="display: none;">
+                                            <label for="postJSON">Json body:</label>
+                                            <input id="postJSON" class="jsonInput" type="text"/>
+                                        </div>
+                                        <div id="PUT" class="tabcontent" style="display: none;">
+                                            <label for="putJSON">Json body:</label>
+                                            <input id="putJSON" class="jsonInput" type="text"/>
+                                        </div>
+                                        <div id="DELETE" class="tabcontent" style="display: none;">
+                                            <label for="deleteId">ID:</label>
+                                            <input id="deleteId" type="number"/>
+                                        </div>
+                                    </div>
+                                    <div id="getQueries" style="padding: 5px">
+                                    </div>
                                 </div>
-                                <div id="PUT" class="tabcontent" style="display: none;">
-                                    <p>PUT</p>
-                                    <input type="text"/>
-                                </div>
-                                <div id="DELETE" class="tabcontent" style="display: none;">
-                                    <p>DELETE</p>
-                                    <input type="number"/>
-                                </div>
+                                <button id="sendRequestButton">
+                                    Send Request
+                                </button>
                             </div>
-                            <select name="data type" id="dataTypes" onChange="selectDataType(this)">
-                            </select>
-                            <button id="myButton">
-                                Send Request
-                            </button>
                             <div>
                                 <pre><code id="responseData"></code></pre>
                             </div>
