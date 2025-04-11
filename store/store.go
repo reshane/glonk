@@ -167,6 +167,7 @@ func getAuthorIdCol(typ reflect.Type) (string, error) {
 func intoSqlFields(typ reflect.Type) ([]string, error) {
     colNames := []string{glonkIdTag}
     fields := map[string]string{}
+    glonkNames := make([]string, 0)
     for i := 0; i < typ.NumField(); i++ {
         if typ.Field(i).IsExported() {
             glonkName, err := getGlonkName(typ.Field(i))
@@ -179,6 +180,7 @@ func intoSqlFields(typ reflect.Type) ([]string, error) {
             }
             
             fields[glonkName] = typ.Field(i).Name
+            glonkNames = append(glonkNames, glonkName)
         }
     }
     if _, exists := fields[glonkIdTag]; exists {
@@ -190,8 +192,10 @@ func intoSqlFields(typ reflect.Type) ([]string, error) {
         delete(fields, glonkOwnerIdTag)
         colNames = append(colNames, glonkOwnerIdTag)
     }
-    for k, _ := range fields {
-        colNames = append(colNames, k)
+    for _, glonkName := range glonkNames {
+        if _, exists := fields[glonkName]; exists {
+            colNames = append(colNames, glonkName)
+        }
     }
     return colNames, nil
 }
