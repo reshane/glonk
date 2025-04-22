@@ -27,6 +27,6 @@ PUT requests are sparse updates
 
 there is no rate limiting, but I can and will wipe the db for any reason or on a whim
 
-See also the in progress [rewrite in rust](https://github.com/reshane/authrs)
+See also the in progress [rewrite in rust](https://github.com/reshane/sprog)
 
 [namesake hint](https://en.wikipedia.org/wiki/Flanimals)
